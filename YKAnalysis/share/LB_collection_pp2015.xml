@@ -1,0 +1,38 @@
+<?xml version="1.0" ?>
+<LumiRangeCollection>
+   <NamedLumiRange>
+      <Name>HIanalysis_solenoidOn</Name>
+      <Metadata Name="RunList">286282,286328,286361,286364,286367,286411,286474</Metadata>
+      <LumiBlockCollection>
+         <Run>286474</Run>
+         <LBRange Start="155" End="523"/>
+      </LumiBlockCollection>
+      <LumiBlockCollection>
+         <Run>286411</Run>
+         <LBRange Start="319" End="1167"/>
+      </LumiBlockCollection>
+      <LumiBlockCollection>
+         <Run>286367</Run>
+         <LBRange Start="4" End="149"/>
+      </LumiBlockCollection>
+      <LumiBlockCollection>
+         <Run>286364</Run>
+         <LBRange Start="141" End="647"/>
+      </LumiBlockCollection>
+      <LumiBlockCollection>
+         <Run>286361</Run>
+         <LBRange Start="143" End="280"/>
+      </LumiBlockCollection>
+      <LumiBlockCollection>
+         <Run>286328</Run>
+         <LBRange Start="245" End="381"/>
+      </LumiBlockCollection>
+      <LumiBlockCollection>
+         <Run>286282</Run>
+         <LBRange Start="239" End="381"/>
+         <LBRange Start="556" End="667"/>
+         <LBRange Start="724" End="1044"/>
+         <LBRange Start="1160" End="1189"/>
+      </LumiBlockCollection>
+   </NamedLumiRange>
+</LumiRangeCollection>
