@@ -360,7 +360,7 @@ void JetAnalysis :: JetAnalysis :: SaveJets(  float pTmin,
   for( unsigned int iJet = 0; iJet < recoJets->size(); iJet++){ 
     const xAOD::JetFourMom_t calibJetP4 = calibRecoJets->at(iJet)->jetP4();
     
-    if( calibJetP4.pt() < pTmin && nSavedJets >= 3 ) continue;
+    if( calibJetP4.pt() < pTmin ) continue;
   
     const xAOD::JetFourMom_t defaultJetP4 = recoJets->at(iJet)->jetP4();
     const xAOD::JetFourMom_t emScaleJetP4 = recoJets->at(iJet)->jetP4("JetEMScaleMomentum");
@@ -391,7 +391,7 @@ void JetAnalysis :: JetAnalysis :: SaveJets(  float pTmin,
   for( const auto* jet : *jets ){
     const xAOD::JetFourMom_t jetP4 = jet->jetP4();
 
-    if( jetP4.pt() < pTmin && nSavedJets >= 3 ) continue;
+    if( jetP4.pt() < pTmin ) continue;
 
     v_jets.push_back( TLorentzVector( jetP4.px(), jetP4.py(), 
 				      jetP4.pz(), jetP4.e() ) ); 
@@ -411,7 +411,7 @@ void JetAnalysis :: JetAnalysis :: SaveJets(  float pTmin,
   for( const auto* jet : *jets ){
     const xAOD::JetFourMom_t jetP4 = jet->jetP4( scale );
 
-    if( jetP4.pt() < pTmin && nSavedJets >= 3 ) continue;
+    if( jetP4.pt() < pTmin ) continue;
 
     v_jets.push_back( TLorentzVector( jetP4.px(), jetP4.py(), jetP4.pz(), jetP4.e() ) );
 

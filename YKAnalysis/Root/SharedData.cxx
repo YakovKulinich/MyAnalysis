@@ -17,7 +17,10 @@ YKAnalysis :: SharedData :: SharedData ()
   :  m_eventStore(NULL), 
      m_eventCounter(0),      
      m_outputFileName( "" ), 
-     m_configFileName( "" )
+     m_configFileName( "" ),
+     m_fout(NULL),
+     m_tree(NULL),
+     m_config(NULL)
 {}
 
 /** @brief Constructor for SharedData.
@@ -32,7 +35,10 @@ YKAnalysis :: SharedData :: SharedData ( const std::string& outputFileName,
   :  m_eventStore(NULL), 
      m_eventCounter(0),      
      m_outputFileName( outputFileName ), 
-     m_configFileName( configFileName )
+     m_configFileName( configFileName ),
+     m_fout(NULL),
+     m_tree(NULL),
+     m_config(NULL)
 {}
 
 /** @brief Destructor for SharedData.

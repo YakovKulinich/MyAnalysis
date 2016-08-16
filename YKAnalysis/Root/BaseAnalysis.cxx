@@ -248,7 +248,7 @@ xAOD::TReturnCode YKAnalysis :: BaseAnalysis :: ProcessEvent(){
       return xAOD::TReturnCode::kRecoverable; // go to next event
     }
   }
-  /*
+ 
   //-------------------------------    
   // VERTEX                                                         
   //-------------------------------
@@ -263,7 +263,7 @@ xAOD::TReturnCode YKAnalysis :: BaseAnalysis :: ProcessEvent(){
   if( n_vertices < 2 ){ 
     return xAOD::TReturnCode::kRecoverable; // goto next event
   }
-  */
+
   return xAOD::TReturnCode::kSuccess;
 }
 
