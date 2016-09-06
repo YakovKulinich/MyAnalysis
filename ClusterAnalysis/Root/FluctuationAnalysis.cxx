@@ -53,7 +53,6 @@ ClusterAnalysis :: FluctuationAnalysis :: FluctuationAnalysis ( const std::strin
 
   m_nFCalEtBins = 500 ; 
   m_fCalEtMin = 0;           m_fCalEtMax = 10 ;  // TeV
-
 }
 
 /** @brief Destructor for Fluctuation Analysis.
@@ -76,6 +75,18 @@ xAOD::TReturnCode ClusterAnalysis :: FluctuationAnalysis :: Setup ()
   //-----------------
   TEnv* config = m_sd->GetConfig();
 
+  /*
+  m_v_etaLimits = 
+    vectorise( config->GetValue( "fluctuationEtaLimits" ,"") );
+  */
+  m_v_etaLimits.push_back( 0.7 );
+  m_v_etaLimits.push_back( 1.4 );
+  m_v_etaLimits.push_back( 2.1 );
+  m_v_etaLimits.push_back( 2.8 );
+
+  for( auto& etaLimit : m_v_etaLimits ) 
+    std::cout << "EtaLimit = " << etaLimit << std::endl;
+
   m_window_Eta_size = config->GetValue( "fluctuationWindowEtaSize", 7);
   m_window_Phi_size = config->GetValue( "fluctuationWindowPhiSize", 7);
 
@@ -96,28 +107,6 @@ xAOD::TReturnCode ClusterAnalysis :: FluctuationAnalysis :: HistInitialize ()
 {
   std::cout << m_analysisName << " HistInitialize" << std::endl;
 
-  double etWindowMax = 500; int etWindowBins = 500;
-  if( m_window_Eta_size == 11 ){
-    etWindowMax  = 500;
-    etWindowBins = 500;
-  }
-  else if( m_window_Eta_size == 7){
-    etWindowMax  = 250;
-    etWindowBins = 250;
-  }
-  else if( m_window_Eta_size == 5){
-    etWindowMax  = 125;
-    etWindowBins = 125;
-  }
-  else if( m_window_Eta_size == 3){
-    etWindowMax  = 75;
-    etWindowBins = 150;
-  }
-  else if( m_window_Eta_size ){
-    etWindowMax  = 25;
-    etWindowBins = 50;
-  }
-
   std::vector< double > FCalEtRanges;
   FCalEtRanges.push_back(0.00);
   FCalEtRanges.push_back(0.02);
@@ -131,8 +120,10 @@ xAOD::TReturnCode ClusterAnalysis :: FluctuationAnalysis :: HistInitialize ()
   int nFCalEtBins = FCalEtRanges.size() - 1;
 
   m_sd->AddOutputToTree< double >( "FCalEt", &m_FCalEt );
-  m_sd->AddOutputToTree< double >( "caloFluctuation", &m_caloFluctuation );
-  m_sd->AddOutputToTree< std::vector< double > >( "v_caloFluctuationEtaSlices", &m_v_caloFluctuationEtaSlices );
+  m_sd->AddOutputToTree< std::vector< double > >( "v_caloFluctuations", &m_v_caloFluctuations );
+
+  // m_sd->AddOutputToTree< double >( "caloFluctuation", &m_caloFluctuation );
+  // m_sd->AddOutputToTree< std::vector< double > >( "v_caloFluctuationEtaSlices", &m_v_caloFluctuationEtaSlices );
 
   // "Normal"
   h3_EtaPhiFCalEt = new TH3D("h3_EtaPhiFCalEt","h3_EtaPhiFCalEt;#eta;#phi;#SigmaE_{T} (3.2<|#eta|<4.6) [TeV]",
@@ -223,20 +214,20 @@ xAOD::TReturnCode ClusterAnalysis :: FluctuationAnalysis :: ProcessEvent(){
   for(const auto* caloCluster : *caloClusterContainer){
     
     /*
-    double cc_Eta_cal  = caloCluster->calEta();            // Eta  
-    double cc_Phi_cal  = caloCluster->calPhi();            // Phi  
-    double cc_E_cal    = caloCluster->calE()  * 0.001;     // E  in GeV
-    double cc_Et_cal   = cc_E_cal / TMath::CosH( cc_Eta_cal ); // Et in GeV
+      double cc_Eta_cal  = caloCluster->calEta();            // Eta  
+      double cc_Phi_cal  = caloCluster->calPhi();            // Phi  
+      double cc_E_cal    = caloCluster->calE()  * 0.001;     // E  in GeV
+      double cc_Et_cal   = cc_E_cal / TMath::CosH( cc_Eta_cal ); // Et in GeV
 
-    double cc_Eta_raw  = caloCluster->rawEta();            // Eta
-    double cc_Phi_raw  = caloCluster->rawPhi();            // Phi
-    double cc_E_raw    = caloCluster->rawE()  * 0.001;     // E  in GeV
-    double cc_Et_raw   = cc_E_raw / TMath::CosH( cc_Eta_raw ); // Et in GeV
+      double cc_Eta_raw  = caloCluster->rawEta();            // Eta
+      double cc_Phi_raw  = caloCluster->rawPhi();            // Phi
+      double cc_E_raw    = caloCluster->rawE()  * 0.001;     // E  in GeV
+      double cc_Et_raw   = cc_E_raw / TMath::CosH( cc_Eta_raw ); // Et in GeV
 
-    double cc_Eta_alt  = caloCluster->altEta();            // Eta
-    double cc_Phi_alt  = caloCluster->altPhi();            // Phi
-    double cc_E_alt    = caloCluster->altE()  * 0.001;     // E  in GeV
-    double cc_Et_alt   = cc_E_alt / TMath::CosH( cc_Eta_alt ); // Et in GeV
+      double cc_Eta_alt  = caloCluster->altEta();            // Eta
+      double cc_Phi_alt  = caloCluster->altPhi();            // Phi
+      double cc_E_alt    = caloCluster->altE()  * 0.001;     // E  in GeV
+      double cc_Et_alt   = cc_E_alt / TMath::CosH( cc_Eta_alt ); // Et in GeV
     */
 
     double cc_Eta  = caloCluster->eta();              // Phi
@@ -250,11 +241,20 @@ xAOD::TReturnCode ClusterAnalysis :: FluctuationAnalysis :: ProcessEvent(){
     h2_EtaPhi.Fill( cc_Eta, cc_Phi, cc_Et );  // temp histo to be sent to AnalyzeFluctiations
   } // end for loop over cluster
   
-  m_v_caloFluctuationEtaSlices.clear();
+  /*
+    m_v_caloFluctuationEtaSlices.clear();
 
-  m_caloFluctuation = AnalyzeFluctuations( &h2_EtaPhi, 
-					   4.9,
-					   m_v_caloFluctuationEtaSlices );
+    m_caloFluctuation = AnalyzeFluctuations( &h2_EtaPhi, 
+    m_etaLimit,
+    m_v_caloFluctuationEtaSlices );
+  */
+
+  m_v_caloFluctuations.clear();
+
+  for( auto& etaLimit : m_v_etaLimits ){
+    m_v_caloFluctuations.
+      push_back( AnalyzeFluctuations( &h2_EtaPhi, etaLimit ) );
+  }
   
   return xAOD::TReturnCode::kSuccess;
 }
@@ -285,6 +285,76 @@ xAOD::TReturnCode ClusterAnalysis :: FluctuationAnalysis :: HistFinalize()
   return xAOD::TReturnCode::kSuccess;
 }
 
+/*
+  @brief Method to analize fluctuations in Calorimeters
+
+  Loops though the events calo distribution using a window of 
+  some size and looks at caloFluctuation of all windows.
+  
+  @param1 TH2F Et distribution by (eta,phi)
+  and TH1F to fill with window Et
+  @param2 etaLimit (Absolute value)
+
+  @return caloFluctuation of Et in that event
+*/
+double ClusterAnalysis :: FluctuationAnalysis :: AnalyzeFluctuations ( TH2F* h2_EtaPhi, double etaLimit ){
+ 
+  int nXbins =  h2_EtaPhi->GetXaxis()->GetNbins();
+  int nYbins =  h2_EtaPhi->GetYaxis()->GetNbins();
+
+  int xcorner, xBinMax;
+
+  if( etaLimit != h2_EtaPhi->GetXaxis()->GetXmax() ){
+    xcorner = h2_EtaPhi->GetXaxis()->FindBin( -etaLimit + DELTA );
+    xBinMax = h2_EtaPhi->GetXaxis()->FindBin(  etaLimit + DELTA ) - 1;
+  }
+  else{
+    xcorner = 1;
+    xBinMax = nXbins;
+  }
+
+  double sumWindowEt   = 0;
+  double sumWindowSqEt = 0;
+  int    nWindows      = 0;
+   
+  // nested loop moves top left corner of window around grid
+  // if part of the other edge of h2 doesnt fit
+  // it is not taken into account
+  for(  ; xcorner <= xBinMax - m_window_Eta_size + 1; xcorner += m_window_Eta_size ){
+    for(int ycorner = 1; ycorner <= nYbins - m_window_Phi_size + 1; ycorner += m_window_Phi_size ){
+      double windowEt   = 0;
+      // scans that window
+         int bin = 0;
+
+      for( int xbin = xcorner; xbin < xcorner + m_window_Eta_size; xbin++){
+ 	for( int ybin = ycorner; ybin < ycorner + m_window_Phi_size; ybin++){
+	  windowEt += h2_EtaPhi->GetBinContent( xbin, ybin );
+	}
+      }
+      
+      // total
+      sumWindowEt += windowEt;
+      sumWindowSqEt += (windowEt * windowEt);
+      nWindows++;
+    }  // end ycorner loop
+  } // end xcorner loop
+
+  double caloFluctuation =
+    TMath::Sqrt( sumWindowSqEt / nWindows
+		 - TMath::Power( sumWindowEt / nWindows , 2) );
+  
+  if( m_sd->DoPrint() ){
+    std::cerr << "   etaSize       = " << m_window_Eta_size << std::endl;
+    std::cerr << "   phiSize       = " << m_window_Phi_size << std::endl;
+    std::cerr << "   sumWindowEt   = " << sumWindowEt << std::endl;
+    std::cerr << "   sumWindowSqEt = " << sumWindowSqEt << std::endl;
+    std::cerr << "   nWindows      = " << nWindows << std::endl;
+    std::cerr << "   caloFluc      = " << caloFluctuation << std::endl;
+    std::cerr << "   FCalEt        = " << m_FCalEt << std::endl;
+  }
+
+  return caloFluctuation;
+}
 
 /*
   @brief Method to analize fluctuations in Calorimeters
@@ -303,25 +373,24 @@ xAOD::TReturnCode ClusterAnalysis :: FluctuationAnalysis :: HistFinalize()
 */
 double ClusterAnalysis :: FluctuationAnalysis :: AnalyzeFluctuations ( TH2F* h2_EtaPhi, double etaLimit, std::vector<double>& v_caloFluctuationEtaSlices){
  
-  double sumWindowEt = 0;
-  double sumWindowSqEt = 0;
-
   int nXbins =  h2_EtaPhi->GetXaxis()->GetNbins();
   int nYbins =  h2_EtaPhi->GetYaxis()->GetNbins();
 
   int xcorner, xBinMax;
 
   if( etaLimit != h2_EtaPhi->GetXaxis()->GetXmax() ){
-    xcorner = h2_EtaPhi->GetXaxis()->FindBin( -etaLimit - DELTA );
-    xBinMax = h2_EtaPhi->GetXaxis()->FindBin( etaLimit + DELTA) - 1;
+    xcorner = h2_EtaPhi->GetXaxis()->FindBin( -etaLimit + DELTA );
+    xBinMax = h2_EtaPhi->GetXaxis()->FindBin(  etaLimit + DELTA ) - 1;
   }
   else{
     xcorner = 1;
     xBinMax = nXbins;
   }
 
-  int nWindows = 0;
-
+  double sumWindowEt   = 0;
+  double sumWindowSqEt = 0;
+  int    nWindows      = 0;
+   
   // nested loop moves top left corner of window around grid
   // if part of the other edge of h2 doesnt fit
   // it is not taken into account
@@ -329,16 +398,19 @@ double ClusterAnalysis :: FluctuationAnalysis :: AnalyzeFluctuations ( TH2F* h2_
 
     double sumWindowEtSlice   = 0;
     double sumWindowSqEtSlice = 0;
-    double nWindowsSlice      = 0;
+    int    nWindowsSlice      = 0;
 
     for(int ycorner = 1; ycorner <= nYbins - m_window_Phi_size + 1; ycorner += m_window_Phi_size ){
       double windowEt   = 0;
       // scans that window
+      int bin = 0;
+
       for( int xbin = xcorner; xbin < xcorner + m_window_Eta_size; xbin++){
-	for( int ybin = ycorner; ybin < ycorner + m_window_Phi_size; ybin++){
+ 	for( int ybin = ycorner; ybin < ycorner + m_window_Phi_size; ybin++){
 	  windowEt += h2_EtaPhi->GetBinContent( xbin, ybin );
 	}
       }
+      
       // total
       sumWindowEt += windowEt;
       sumWindowSqEt += (windowEt * windowEt);
@@ -350,14 +422,26 @@ double ClusterAnalysis :: FluctuationAnalysis :: AnalyzeFluctuations ( TH2F* h2_
       nWindowsSlice++;
     }  // end ycorner loop
     
-    double caloFluctuationSlice = TMath::Sqrt( sumWindowSqEtSlice / nWindowsSlice
-			      - TMath::Power( sumWindowEtSlice / nWindowsSlice , 2) );
-  
+    double caloFluctuationSlice = 
+      TMath::Sqrt( sumWindowSqEtSlice / nWindowsSlice
+		   - TMath::Power( sumWindowEtSlice / nWindowsSlice , 2) );
+    
     v_caloFluctuationEtaSlices.push_back( caloFluctuationSlice );
   } // end xcorner loop
 
-  double caloFluctuation = TMath::Sqrt( sumWindowSqEt / nWindows
-			      - TMath::Power( sumWindowEt / nWindows , 2) );
+  double caloFluctuation =
+    TMath::Sqrt( sumWindowSqEt / nWindows
+		 - TMath::Power( sumWindowEt / nWindows , 2) );
   
+  if( m_sd->DoPrint() ){
+    std::cerr << "   etaSize       = " << m_window_Eta_size << std::endl;
+    std::cerr << "   phiSize       = " << m_window_Phi_size << std::endl;
+    std::cerr << "   sumWindowEt   = " << sumWindowEt << std::endl;
+    std::cerr << "   sumWindowSqEt = " << sumWindowSqEt << std::endl;
+    std::cerr << "   nWindows      = " << nWindows << std::endl;
+    std::cerr << "   caloFluc      = " << caloFluctuation << std::endl;
+    std::cerr << "   FCalEt        = " << m_FCalEt << std::endl;
+  }
+
   return caloFluctuation;
 }

@@ -42,10 +42,10 @@ int main( int argc, char* argv[] ){
   manager->AddAnalysis( make_shared<YKAnalysis::BaseAnalysis>() );
 
   // should add JetAnalysis. 
-  manager->AddAnalysis( make_shared<JetAnalysis::JetAnalysis>() );
+  //  manager->AddAnalysis( make_shared<JetAnalysis::JetAnalysis>() );
 
   // should add FluctuationAnalysis. 
-  // manager->AddAnalysis( make_shared<ClusterAnalysis::FluctuationAnalysis>() );
+  manager->AddAnalysis( make_shared<ClusterAnalysis::FluctuationAnalysis>() );
 
 
   // Run

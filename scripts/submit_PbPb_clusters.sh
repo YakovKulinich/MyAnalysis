@@ -16,13 +16,13 @@ for fn in ${INLIST[@]} ; do
 
   outFn=${fn//merge.AOD/Fluctuations}
   INDS=$fn
-  OUTDS=$outFn
+  OUTDS=user.${USERNAME}.${outFn}.${DATE}.121
 
 	echo "Submitting to "${INDS}
-  echo "Output DS name: "user.${USERNAME}.${OUTDS}.${DATE}
+  echo "Output DS name: "${OUTDS}
 
   prun --inDS=${INDS}\
-       --outDS=user.${USERNAME}.${OUTDS}.${DATE}\
+       --outDS=${OUTDS}\
        --outputs=${OUTPUTS}\
        --exec="echo %IN > inputFiles.txt; runAnalysis ${CONFIG}"\
        --useRootCore\
@@ -33,4 +33,4 @@ for fn in ${INLIST[@]} ; do
 
 	 now=$(date +"%T")
 	 echo "Current time : $now"
-done                  #
+done
