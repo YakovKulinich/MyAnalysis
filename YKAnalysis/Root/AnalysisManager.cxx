@@ -221,7 +221,10 @@ xAOD::TReturnCode YKAnalysis :: AnalysisManager :: EventLoop ()
     if( m_sd->DoPrint() ) std::cout << "\nSampleEvent : " << m_sd->GetEventCounter() << std::endl;
 
     for( auto& ana : m_v_analysis ){ 
-      if( ana->ProcessEvent() !=  xAOD::TReturnCode::kSuccess ) isGoodEvent = false;
+      if( ana->ProcessEvent() !=  xAOD::TReturnCode::kSuccess ) {
+	isGoodEvent = false;
+	break;
+      }
     }
 
     if( !isGoodEvent ) continue;

@@ -31,18 +31,19 @@ namespace ClusterAnalysis{
     virtual xAOD::TReturnCode Finalize       ();
     virtual xAOD::TReturnCode HistFinalize   ();
 
-    double AnalyzeFluctuations ( TH2F*, double );
-    double AnalyzeFluctuations ( TH2F*, double, std::vector<double>& );
+    double AnalyzeFluctuations
+      ( TH2D*, double );
+    double AnalyzeFluctuationsEtaSlices 
+      ( TH2D*, double, std::vector<double>&, TH3D* );
    
   private:
     // For tree
     double m_FCalEt;
     std::vector< double > m_v_caloFluctuations;
     std::vector< double > m_v_caloFluctuationEtaSlices;
-
+    
     // Histograms
-    TH3D* h3_EtaPhiFCalEt;
-    TH3D* h3_EtaPhiFCalEt_UW;
+    TH3D* h3_EtaFCalEtWindowEt;
     
     TH1D* h1_FCalEt;
 
@@ -59,6 +60,8 @@ namespace ClusterAnalysis{
     double m_etaMin, m_etaMax, m_phiMin, m_phiMax;
     double m_fCalEtMin, m_fCalEtMax;
     int    m_nEtaBins, m_nPhiBins, m_nFCalEtBins;
+    double m_windowEtMin, m_windowEtMax;
+    int    m_nWindowEtBins;
 
     const double DELTA = 0.001;
 

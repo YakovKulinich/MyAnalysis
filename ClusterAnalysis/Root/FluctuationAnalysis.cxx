@@ -25,13 +25,16 @@ ClusterAnalysis :: FluctuationAnalysis :: FluctuationAnalysis ()
   m_window_Phi_size = 7;
 
   m_nEtaBins = 100;
-  m_etaMin = -5;             m_etaMax = 5;      
+  m_etaMin   = -5;             m_etaMax = 5;      
   
   m_nPhiBins = 64;
-  m_phiMin = -TMath::Pi();   m_phiMax = TMath::Pi(); 
+  m_phiMin   = -TMath::Pi();   m_phiMax = TMath::Pi(); 
 
-  m_nFCalEtBins = 500 ; 
-  m_fCalEtMin = 0;           m_fCalEtMax = 10 ;  // TeV
+  m_nFCalEtBins = 600 ; 
+  m_fCalEtMin   = 0;           m_fCalEtMax = 6 ;  // TeV
+  
+  m_nWindowEtBins = 250;
+  m_windowEtMin   = 0;         m_windowEtMax   = 250;  // GeV
 }
 
 
@@ -51,8 +54,11 @@ ClusterAnalysis :: FluctuationAnalysis :: FluctuationAnalysis ( const std::strin
   m_nPhiBins = 64;
   m_phiMin = -TMath::Pi();   m_phiMax = TMath::Pi(); 
 
-  m_nFCalEtBins = 500 ; 
-  m_fCalEtMin = 0;           m_fCalEtMax = 10 ;  // TeV
+  m_nFCalEtBins = 600 ; 
+  m_fCalEtMin = 0;           m_fCalEtMax = 6 ;  // TeV
+
+  m_nWindowEtBins = 250;
+  m_windowEtMin   = 0;         m_windowEtMax   = 250;  // GeV
 }
 
 /** @brief Destructor for Fluctuation Analysis.
@@ -75,10 +81,6 @@ xAOD::TReturnCode ClusterAnalysis :: FluctuationAnalysis :: Setup ()
   //-----------------
   TEnv* config = m_sd->GetConfig();
 
-  /*
-  m_v_etaLimits = 
-    vectorise( config->GetValue( "fluctuationEtaLimits" ,"") );
-  */
   m_v_etaLimits.push_back( 0.7 );
   m_v_etaLimits.push_back( 1.4 );
   m_v_etaLimits.push_back( 2.1 );
@@ -119,33 +121,21 @@ xAOD::TReturnCode ClusterAnalysis :: FluctuationAnalysis :: HistInitialize ()
   TAxis* axis = 0;
   int nFCalEtBins = FCalEtRanges.size() - 1;
 
+  h3_EtaFCalEtWindowEt = new TH3D("h3_EtaFCalEtWindowEt",";#eta;#SigmaE_{T} (3.2<|#eta|<4.6) [TeV];#SigmaE_{T} Window",
+				  m_nEtaBins, m_etaMin, m_etaMax,
+				  m_nFCalEtBins, m_fCalEtMin, m_fCalEtMax,
+				  m_nWindowEtBins, m_windowEtMin, m_windowEtMax ); // for 7x7 window for now
+  h3_EtaFCalEtWindowEt->Sumw2();
+  m_sd->AddOutputHistogram( h3_EtaFCalEtWindowEt );
+
   m_sd->AddOutputToTree< double >( "FCalEt", &m_FCalEt );
   m_sd->AddOutputToTree< std::vector< double > >( "v_caloFluctuations", &m_v_caloFluctuations );
 
-  // m_sd->AddOutputToTree< double >( "caloFluctuation", &m_caloFluctuation );
-  // m_sd->AddOutputToTree< std::vector< double > >( "v_caloFluctuationEtaSlices", &m_v_caloFluctuationEtaSlices );
-
-  // "Normal"
-  h3_EtaPhiFCalEt = new TH3D("h3_EtaPhiFCalEt","h3_EtaPhiFCalEt;#eta;#phi;#SigmaE_{T} (3.2<|#eta|<4.6) [TeV]",
-			     m_nEtaBins, m_etaMin, m_etaMax,
-			     m_nPhiBins, m_phiMin, m_phiMax,
-			     nFCalEtBins, FCalEtRanges.front(), FCalEtRanges.back() );     
-  axis = h3_EtaPhiFCalEt->GetZaxis();
-  axis->Set( nFCalEtBins, &( FCalEtRanges[0]) );  
-  h3_EtaPhiFCalEt->Sumw2();
-  m_sd->AddOutputHistogram( h3_EtaPhiFCalEt );
- 
-  // UW
-  h3_EtaPhiFCalEt_UW = new TH3D("h3_EtaPhiFCalEt_UW","h3_EtaPhiFCalEt;#eta;#phi;#SigmaE_{T} (3.2<|#eta|<4.6) [TeV]",
-				m_nEtaBins, m_etaMin, m_etaMax,
-				m_nPhiBins, m_phiMin, m_phiMax,
-				nFCalEtBins, FCalEtRanges.front(), FCalEtRanges.back() );
-  axis = h3_EtaPhiFCalEt_UW->GetZaxis();
-  axis->Set( nFCalEtBins, &( FCalEtRanges[0]) );  
-  m_sd->AddOutputHistogram( h3_EtaPhiFCalEt_UW );
+  m_sd->AddOutputToTree< std::vector< double > >( "v_caloFluctuationEtaSlices", &m_v_caloFluctuationEtaSlices );
 
   // FCalEt
-  h1_FCalEt  = new TH1D("h1_FCalEt", ";#SigmaE_{T} (3.2<|#eta|<4.6) [TeV];Entries", m_nFCalEtBins, m_fCalEtMin, m_fCalEtMax);
+  h1_FCalEt  = new TH1D("h1_FCalEt", ";#SigmaE_{T} (3.2<|#eta|<4.6) [TeV];Entries", 
+			m_nFCalEtBins * 10, m_fCalEtMin, m_fCalEtMax);
   m_sd->AddOutputHistogram( h1_FCalEt );
 
   return xAOD::TReturnCode::kSuccess;
@@ -179,7 +169,6 @@ xAOD::TReturnCode ClusterAnalysis :: FluctuationAnalysis :: ProcessEvent(){
   // FCALSUM                                                              
   //-------------------------------
   m_FCalEt = -1; 
-
   // calosums container, initialize here to avoid problems later
   const xAOD::HIEventShapeContainer* caloSumContainer = 0;    // calosum container    
 
@@ -208,49 +197,23 @@ xAOD::TReturnCode ClusterAnalysis :: FluctuationAnalysis :: ProcessEvent(){
       
   // make a (temp) 2d histo which has eta,phi distribution of Et.
   // it goes to the tool
-  TH2F h2_EtaPhi("h2_EtaPhi","h2_EtaPhi",  m_nEtaBins, m_etaMin, m_etaMax,  m_nPhiBins, m_phiMin, m_phiMax);
+  TH2D h2_EtaPhi("h2_EtaPhi","h2_EtaPhi",  m_nEtaBins, m_etaMin, m_etaMax,  m_nPhiBins, m_phiMin, m_phiMax);
 
   // loop over cluster container
   for(const auto* caloCluster : *caloClusterContainer){
-    
-    /*
-      double cc_Eta_cal  = caloCluster->calEta();            // Eta  
-      double cc_Phi_cal  = caloCluster->calPhi();            // Phi  
-      double cc_E_cal    = caloCluster->calE()  * 0.001;     // E  in GeV
-      double cc_Et_cal   = cc_E_cal / TMath::CosH( cc_Eta_cal ); // Et in GeV
-
-      double cc_Eta_raw  = caloCluster->rawEta();            // Eta
-      double cc_Phi_raw  = caloCluster->rawPhi();            // Phi
-      double cc_E_raw    = caloCluster->rawE()  * 0.001;     // E  in GeV
-      double cc_Et_raw   = cc_E_raw / TMath::CosH( cc_Eta_raw ); // Et in GeV
-
-      double cc_Eta_alt  = caloCluster->altEta();            // Eta
-      double cc_Phi_alt  = caloCluster->altPhi();            // Phi
-      double cc_E_alt    = caloCluster->altE()  * 0.001;     // E  in GeV
-      double cc_Et_alt   = cc_E_alt / TMath::CosH( cc_Eta_alt ); // Et in GeV
-    */
-
     double cc_Eta  = caloCluster->eta();              // Phi
     double cc_Phi  = caloCluster->phi();              // Phi
     double cc_E    = caloCluster->e() * 0.001;        // E in GeV
     double cc_Et   = cc_E / TMath::CosH( cc_Eta );    // Et in GeV
 
-    h3_EtaPhiFCalEt->Fill( cc_Eta, cc_Phi, m_FCalEt, cc_Et);
-    h3_EtaPhiFCalEt_UW->Fill( cc_Eta, cc_Phi, m_FCalEt, 1);
-
     h2_EtaPhi.Fill( cc_Eta, cc_Phi, cc_Et );  // temp histo to be sent to AnalyzeFluctiations
   } // end for loop over cluster
   
-  /*
-    m_v_caloFluctuationEtaSlices.clear();
+  m_v_caloFluctuationEtaSlices.clear();
+  AnalyzeFluctuationsEtaSlices( &h2_EtaPhi, m_v_etaLimits.back(), 
+				m_v_caloFluctuationEtaSlices, h3_EtaFCalEtWindowEt );  
 
-    m_caloFluctuation = AnalyzeFluctuations( &h2_EtaPhi, 
-    m_etaLimit,
-    m_v_caloFluctuationEtaSlices );
-  */
-
-  m_v_caloFluctuations.clear();
-
+  m_v_caloFluctuations.clear(); 
   for( auto& etaLimit : m_v_etaLimits ){
     m_v_caloFluctuations.
       push_back( AnalyzeFluctuations( &h2_EtaPhi, etaLimit ) );
@@ -291,14 +254,13 @@ xAOD::TReturnCode ClusterAnalysis :: FluctuationAnalysis :: HistFinalize()
   Loops though the events calo distribution using a window of 
   some size and looks at caloFluctuation of all windows.
   
-  @param1 TH2F Et distribution by (eta,phi)
+  @param1 TH2D Et distribution by (eta,phi)
   and TH1F to fill with window Et
   @param2 etaLimit (Absolute value)
 
   @return caloFluctuation of Et in that event
 */
-double ClusterAnalysis :: FluctuationAnalysis :: AnalyzeFluctuations ( TH2F* h2_EtaPhi, double etaLimit ){
- 
+double ClusterAnalysis :: FluctuationAnalysis :: AnalyzeFluctuations ( TH2D* h2_EtaPhi, double etaLimit ){
   int nXbins =  h2_EtaPhi->GetXaxis()->GetNbins();
   int nYbins =  h2_EtaPhi->GetYaxis()->GetNbins();
 
@@ -322,10 +284,9 @@ double ClusterAnalysis :: FluctuationAnalysis :: AnalyzeFluctuations ( TH2F* h2_
   // it is not taken into account
   for(  ; xcorner <= xBinMax - m_window_Eta_size + 1; xcorner += m_window_Eta_size ){
     for(int ycorner = 1; ycorner <= nYbins - m_window_Phi_size + 1; ycorner += m_window_Phi_size ){
+
       double windowEt   = 0;
       // scans that window
-         int bin = 0;
-
       for( int xbin = xcorner; xbin < xcorner + m_window_Eta_size; xbin++){
  	for( int ybin = ycorner; ybin < ycorner + m_window_Phi_size; ybin++){
 	  windowEt += h2_EtaPhi->GetBinContent( xbin, ybin );
@@ -364,15 +325,15 @@ double ClusterAnalysis :: FluctuationAnalysis :: AnalyzeFluctuations ( TH2F* h2_
   
   Also do this for individual eta slices.
 
-  @param1 TH2F Et distribution by (eta,phi)
+  @param1 TH2D Et distribution by (eta,phi)
   and TH1F to fill with window Et
   @param2 etaLimit (Absolute value)
   @param3 vector with caloFluctuations of eta slices.
 
   @return caloFluctuation of Et in that event
 */
-double ClusterAnalysis :: FluctuationAnalysis :: AnalyzeFluctuations ( TH2F* h2_EtaPhi, double etaLimit, std::vector<double>& v_caloFluctuationEtaSlices){
- 
+double ClusterAnalysis :: FluctuationAnalysis :: AnalyzeFluctuationsEtaSlices
+( TH2D* h2_EtaPhi, double etaLimit, std::vector<double>& v_caloFluctuationEtaSlices, TH3D* h3_EtaFCalEtWindowEt ){
   int nXbins =  h2_EtaPhi->GetXaxis()->GetNbins();
   int nYbins =  h2_EtaPhi->GetYaxis()->GetNbins();
 
@@ -401,10 +362,9 @@ double ClusterAnalysis :: FluctuationAnalysis :: AnalyzeFluctuations ( TH2F* h2_
     int    nWindowsSlice      = 0;
 
     for(int ycorner = 1; ycorner <= nYbins - m_window_Phi_size + 1; ycorner += m_window_Phi_size ){
+      
       double windowEt   = 0;
       // scans that window
-      int bin = 0;
-
       for( int xbin = xcorner; xbin < xcorner + m_window_Eta_size; xbin++){
  	for( int ybin = ycorner; ybin < ycorner + m_window_Phi_size; ybin++){
 	  windowEt += h2_EtaPhi->GetBinContent( xbin, ybin );
@@ -416,6 +376,10 @@ double ClusterAnalysis :: FluctuationAnalysis :: AnalyzeFluctuations ( TH2F* h2_
       sumWindowSqEt += (windowEt * windowEt);
       nWindows++;
       
+      // fill 3d histo
+      double etaValue = h3_EtaFCalEtWindowEt->GetXaxis()->GetBinCenter( xcorner );
+      h3_EtaFCalEtWindowEt->Fill( etaValue, m_FCalEt, windowEt );
+
       // eta (xcorner) slices
       sumWindowEtSlice += windowEt;
       sumWindowSqEtSlice += (windowEt * windowEt);
