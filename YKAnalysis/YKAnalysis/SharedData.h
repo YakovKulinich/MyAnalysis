@@ -45,11 +45,13 @@ namespace YKAnalysis{
     void   AddOutputToTree    ( const std::string&, T*);
     void   AddOutputHistogram ( TH1* );
    
-    int    GetEventCounter  () { return m_eventCounter; }
+    int    GetEventCounter    () { return m_eventCounter; }
 
-    TEnv*  GetConfig        () { return m_config; }
+    TEnv*  GetConfig          () { return m_config; }
 
-    void   EndOfEvent       ();
+    TH1*   GetEventStatistics () { return m_hEventStatistics; }
+
+    void   EndOfEvent       ( bool );
 
     bool   DoPrint          ();
 
@@ -57,16 +59,19 @@ namespace YKAnalysis{
 
   private:
     xAOD::TEvent* m_eventStore;
-
-    TEnv*   m_config;
-    TFile*  m_fout;
-    TTree*  m_tree;
-    std::vector< TH1* > m_v_hists;
     
-    int     m_eventCounter;
+    int           m_eventCounter;
 
-    std::string  m_outputFileName;
-    std::string  m_configFileName;
+    std::string   m_outputFileName;
+    std::string   m_configFileName;
+
+    TFile*        m_fout;
+    TTree*        m_tree;
+    TEnv*         m_config;
+
+    std::vector< TH1* > m_v_hists;
+
+    TH1*          m_hEventStatistics;
   };
 
 }

@@ -40,16 +40,15 @@ namespace YKAnalysis{
   private:
     std::string m_grlFileName;
 
-    bool m_isData;
-
     int  m_eventNumber;         
     int  m_LBN;                  
+    int  m_runNumber;
 
     //-----------------------
     // Triggers
     //-----------------------
     std::string m_triggerMenu;
-    std::vector < std::string >     m_v_triggers;
+    std::vector < std::string >    m_v_triggers;
     std::map< std::string, bool >  m_m_passed_triggers;
     std::map< std::string, float > m_m_prescale_triggers;
 

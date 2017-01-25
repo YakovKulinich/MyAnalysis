@@ -39,13 +39,16 @@ int main( int argc, char* argv[] ){
  
   // should add BaseAnalysis. 
   // Leave it here in case decide to add options later
+  // If you do add it, add it first, because it has event selection -
+  // things like trigger decision, and you dont want to run the other 
+  // analysis in case you dont pass trigger (or maybe you do, depends)
   manager->AddAnalysis( make_shared<YKAnalysis::BaseAnalysis>() );
 
   // should add JetAnalysis. 
-  //  manager->AddAnalysis( make_shared<JetAnalysis::JetAnalysis>() );
+  manager->AddAnalysis( make_shared<JetAnalysis::JetAnalysis>() );
 
   // should add FluctuationAnalysis. 
-  manager->AddAnalysis( make_shared<ClusterAnalysis::FluctuationAnalysis>() );
+  // manager->AddAnalysis( make_shared<ClusterAnalysis::FluctuationAnalysis>() );
 
 
   // Run

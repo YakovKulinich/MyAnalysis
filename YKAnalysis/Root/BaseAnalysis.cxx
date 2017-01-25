@@ -6,6 +6,8 @@
  *  It initializes tools such as GRL,
  *  trigger decision, and vertex tools.
  *
+ *  Event selection is done here, so it is an important class.
+ *
  *  @author Yakov Kulinich
  *  @bug No known bugs.
  */
@@ -71,8 +73,6 @@ xAOD::TReturnCode YKAnalysis :: BaseAnalysis :: Setup ()
   //-----------------
   TEnv* config = m_sd->GetConfig();
   
-  m_isData = config->GetValue( "isData", false );
-
   m_triggerMenu = config->GetValue("triggerMenu","");
   m_v_triggers =
     vectorise( config->GetValue( Form("triggers.%s", m_triggerMenu.c_str() ),"") );
@@ -98,8 +98,13 @@ xAOD::TReturnCode YKAnalysis :: BaseAnalysis :: HistInitialize ()
 
   m_sd->AddOutputToTree<int>( "eventNumber", &m_eventNumber );
   m_sd->AddOutputToTree<int>( "LBN", &m_LBN );
+  m_sd->AddOutputToTree<int>( "runNumber", &m_runNumber );
 
-  if( m_isData ){
+  TEnv* config = m_sd->GetConfig();
+
+  bool isData = config->GetValue( "isData", false );
+
+  if( isData ){
     std::cout << "Trigger Menu: " << m_triggerMenu << std::endl; 
     for( auto& tr : m_v_triggers ){
       std::cout << "setting: " << tr << std::endl;
@@ -123,11 +128,15 @@ xAOD::TReturnCode YKAnalysis :: BaseAnalysis :: HistInitialize ()
 xAOD::TReturnCode YKAnalysis :: BaseAnalysis :: Initialize () 
 {
   std::cout << m_analysisName << " Initializing" << std::endl;
+
+  TEnv* config = m_sd->GetConfig();
  
+  bool isData = config->GetValue( "isData", false );
+
   //--------------------------------
   //    GRL - Good Runs List
   //--------------------------------
-  if( m_isData ){
+  if( isData ){
     m_grl = new GoodRunsListSelectionTool("GoodRunsListSelectionTool");
     std::string GRLDirPath = "$ROOTCOREBIN/../YKAnalysis/share/";
   
@@ -155,7 +164,7 @@ xAOD::TReturnCode YKAnalysis :: BaseAnalysis :: Initialize ()
   //--------------------------------
   //    Trigger Decision Tool
   //--------------------------------
-  if( m_isData ){
+  if( isData ){
     // Initialize and configure trigger tools
     m_trigConfigTool = new TrigConf::xAODConfigTool("xAODConfigTool"); // gives us access to the meta-data
     CHECK_STATUS( Form("%s::execute",m_analysisName.c_str() ),
@@ -170,6 +179,14 @@ xAOD::TReturnCode YKAnalysis :: BaseAnalysis :: Initialize ()
     CHECK_STATUS( Form("%s::execute",m_analysisName.c_str() ), 
 		  m_trigDecisionTool->initialize() );
   }
+
+  //--------------------------------
+  //  Event Statistics Histogram
+  //--------------------------------
+  m_sd->GetEventStatistics()->GetXaxis()->SetBinLabel( 3, "GRL Reject" );
+  m_sd->GetEventStatistics()->GetXaxis()->SetBinLabel( 4, "Trigger Reject" );
+  m_sd->GetEventStatistics()->GetXaxis()->SetBinLabel( 5, "Vertex Reject" );
+  m_sd->GetEventStatistics()->GetXaxis()->SetBinLabel( 6, "DAQ Reject" );
 
   return xAOD::TReturnCode::kSuccess;
 }
@@ -201,9 +218,11 @@ xAOD::TReturnCode YKAnalysis :: BaseAnalysis :: ProcessEvent(){
 
   m_eventNumber = eventInfo->eventNumber();
   m_LBN         = eventInfo->lumiBlock();
+  m_runNumber   = eventInfo->runNumber();
 
   if( m_sd->DoPrint() ) {
-    std::cout << "EventNumber : " << m_eventNumber << "  LBN : " << m_LBN << std::endl; 
+    std::cout << "EventNumber : " << m_eventNumber << "  LBN : " << m_LBN 
+	      << "  runNumber : " << m_runNumber   << std::endl; 
   }
   
   //---------------------
@@ -212,6 +231,7 @@ xAOD::TReturnCode YKAnalysis :: BaseAnalysis :: ProcessEvent(){
   // if data check if event passes GRL
   if( !isMC ){ // it's data!
     if( !m_grl->passRunLB(*eventInfo) ){ 
+      m_sd->GetEventStatistics()->Fill( "GRL Reject", 1 );  // grl reject
       return xAOD::TReturnCode::kRecoverable; // goto next event
     } 
   } // end if not MC
@@ -242,9 +262,11 @@ xAOD::TReturnCode YKAnalysis :: BaseAnalysis :: ProcessEvent(){
 	  m_m_passed_triggers[ thisTrig ] = true;
 	  m_m_prescale_triggers[ thisTrig ] = cg->getPrescale();
 	}
-      } // end for loop (c++11 style) over chain group matching v_chainGroups entries 
-    } // end loop over v_chainGroups 
+      } // end for loopover chain group matching v_chainGroups entries 
+    } // end loop over v_chainGroups
+    if( m_sd->DoPrint() ) std::cout << "Event " << m_sd->GetEventCounter() << " passed " << nPassed  << std::endl;
     if( nPassed == 0 ) {
+      m_sd->GetEventStatistics()->Fill( "Trigger Reject", 1 );  // trigger reject
       return xAOD::TReturnCode::kRecoverable; // go to next event
     }
   }
@@ -261,7 +283,24 @@ xAOD::TReturnCode YKAnalysis :: BaseAnalysis :: ProcessEvent(){
 
   // check if we have at least one vertex
   if( n_vertices < 2 ){ 
+    m_sd->GetEventStatistics()->Fill( "Vertex Reject", 1 );  // vertex reject
     return xAOD::TReturnCode::kRecoverable; // goto next event
+  }
+
+  //---------------------
+  // DAQ Errors
+  //---------------------
+  if(!isMC){
+    if( 
+       (eventInfo->errorState(xAOD::EventInfo::LAr)==xAOD::EventInfo::Error ) 
+       || (eventInfo->errorState(xAOD::EventInfo::Tile)==xAOD::EventInfo::Error 
+	   ) || 
+       (eventInfo->errorState(xAOD::EventInfo::SCT)==xAOD::EventInfo::Error ) 
+       || (eventInfo->isEventFlagBitSet(xAOD::EventInfo::Core, 18) ) )
+      {
+	m_sd->GetEventStatistics()->Fill( "DAQ Reject", 1 );  // daq reject
+	return xAOD::TReturnCode::kRecoverable;
+      }
   }
 
   return xAOD::TReturnCode::kSuccess;

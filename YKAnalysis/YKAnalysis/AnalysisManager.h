@@ -42,6 +42,9 @@ namespace YKAnalysis{
     std::string m_analysisName;
     std::string m_inputTreeName;
 
+    std::string m_outputFileName;
+    std::string m_configFileName;
+
     TChain*     m_eventChain;
 
     SharedData* m_sd;

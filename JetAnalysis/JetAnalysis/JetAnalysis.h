@@ -62,19 +62,23 @@ namespace JetAnalysis{
 
   private:
     // For tree
-    std::vector<TLorentzVector> vT_jets;      
-
     std::vector<TLorentzVector> vR_C_jets;    
     std::vector<TLorentzVector> vR_EM_jets;   
     std::vector<TLorentzVector> vR_DF_jets;   
 
+    std::vector<TLorentzVector> vT_jets;      
+
     std::vector<bool>           v_isCleanJet; 
+
+    std::vector<TLorentzVector> vTrig_jets;   
 
     // configs
     bool        m_isData;
     std::string m_recoJetAlgorithm  ; 
     std::string m_recoJetContainer  ; 
     std::string m_truthJetContainer ;
+    std::string m_trigJetContainer  ;
+
     std::string m_calibConfig       ;       
     std::string m_calibSequence     ;    
  

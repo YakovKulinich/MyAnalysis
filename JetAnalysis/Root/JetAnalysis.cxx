@@ -2,9 +2,8 @@
  *  @brief Implementation of JetAnalysis.
  *
  *  Function definitions for JetAnalysis  are provided. 
- *  This class is the main  class for the analysis.
- *  It initializes tools such as GRL,
- *  trigger decision, and vertex tools.
+ *  This class is the main  class for the jet analysis.
+ *  Does some jet selection, calibration. 
  *
  *  @author Yakov Kulinich
  *  @bug No known bugs.
@@ -60,7 +59,7 @@ JetAnalysis :: JetAnalysis :: ~JetAnalysis()
   m_jetCalibrationTool = NULL;  
 }
 
-/** @brief Setup method for Fluctuation Analysis
+/** @brief Setup method for Jet Analysis
  *
  *  @return xAOD::TReturnCode 
  */
@@ -75,13 +74,15 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: Setup ()
 
   m_isData            = config->GetValue( "isData", false );
 
-  m_recoJetAlgorithm  = config->GetValue( "recoJetAlgorithm",  "" );
-  m_recoJetContainer  = config->GetValue( "recoJetContainer",  "" );
+  m_recoJetAlgorithm  = config->GetValue( "recoJetAlgorithm" , "" );
+  m_recoJetContainer  = config->GetValue( "recoJetContainer" , "" );
   m_truthJetContainer = config->GetValue( "truthJetContainer", "" );
-  m_calibConfig       = config->GetValue( "calibConfig",       "" );
+  m_trigJetContainer  = config->GetValue( "trigJetContainer" , "" );
+
+  m_calibConfig       = config->GetValue( "calibConfig"  ,     "" );
   m_calibSequence     = config->GetValue( "calibSequence",     "" );
  
-  m_jetPtMin          = config->GetValue( "jetPtMin", 20 ) * 1000; // GeV
+  m_jetPtMin          = config->GetValue( "jetPtMin", 10 ) * 1000; // GeV
   m_jetRparameter     = config->GetValue( "jetRparameter", 0.4 ) ; 
 
   return xAOD::TReturnCode::kSuccess;
@@ -98,26 +99,31 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: Setup ()
 xAOD::TReturnCode JetAnalysis :: JetAnalysis :: HistInitialize ()
 {
   std::cout << m_analysisName << " HistInitialize" << std::endl;
-  
-  if( !m_isData ){
-    m_sd->AddOutputToTree< std::vector<TLorentzVector> >("vT_jets" , &vT_jets);
-  }
 
+  // Reco jets  
   m_sd->AddOutputToTree< std::vector<TLorentzVector> >("vR_C_jets"  , &vR_C_jets );
   m_sd->AddOutputToTree< std::vector<TLorentzVector> >("vR_DF_jets" , &vR_DF_jets);
   m_sd->AddOutputToTree< std::vector<TLorentzVector> >("vR_EM_jets" , &vR_EM_jets);
   
+  // Truth jets. Only in MC
+  if( !m_isData ){
+    m_sd->AddOutputToTree< std::vector<TLorentzVector> >("vT_jets" , &vT_jets);
+  }
+
   m_sd->AddOutputToTree< std::vector<bool> >("v_isCleanJet", &v_isCleanJet );
-  
+
+  // Trigger jets. Only in Data
+  if( m_isData ){
+    m_sd->AddOutputToTree< std::vector<TLorentzVector> >("vTrig_jets" , &vTrig_jets);
+  }
+
   return xAOD::TReturnCode::kSuccess;
 }
 
 
 /** @brief Initialize method for JetAnalysis.
  *
- *  Sets up tools. I.e. GRL, 
- *  Triggers, vertices, etc. Basically, things
- *  common to most analysis.
+ *  Sets up tools. I.e. Calibration
  *
  *  @return xAOD::TReturnCode 
  */
@@ -190,20 +196,7 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
     isMC = true; // can use this later
   }
 
-  bool keep = true;
-
-  //DAQ errors
-  if(!isMC){
-    if( 
-       (eventInfo->errorState(xAOD::EventInfo::LAr)==xAOD::EventInfo::Error ) 
-       || (eventInfo->errorState(xAOD::EventInfo::Tile)==xAOD::EventInfo::Error 
-	   ) || 
-       (eventInfo->errorState(xAOD::EventInfo::SCT)==xAOD::EventInfo::Error ) 
-       || (eventInfo->isEventFlagBitSet(xAOD::EventInfo::Core, 18) ) )
-      {
-	return xAOD::TReturnCode::kSuccess;
-      }
-  }
+  bool isData = isMC ? false : true;
 
   //-------------------------------    
   // JETS                                                            
@@ -258,8 +251,8 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
     const xAOD::JetFourMom_t jet_4mom_xcalib = newjet->jetP4();
     newjet->setJetP4("JetGSCScaleMomentum", jet_4mom_xcalib);
     
-    if( !isMC ){ CHECK_STATUS( Form("%s::execute",m_analysisName.c_str() ), 
-			       m_jetCalibration_insitu->applyCalibration( *newjet ) );
+    if( isData ){ CHECK_STATUS( Form("%s::execute",m_analysisName.c_str() ), 
+				m_jetCalibration_insitu->applyCalibration( *newjet ) );
     }  
   } // end for loop over jets
  
@@ -285,17 +278,37 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
   } 			
   // DATA
   // no pairing for data since no truth jets just save them
-  else if( !isMC ){
+  else if( isData ){
     SaveJets( m_jetPtMin, recoJets, calibRecoJets, vTemp_isCleanJet,
 	      vR_DF_jets, vR_EM_jets, vR_C_jets, v_isCleanJet );
   } 
-    
+  
   // delete the deep copies
   delete calibRecoJets;
   delete calibRecoJetsAux;
   calibRecoJets    = NULL;
   calibRecoJetsAux = NULL;  
   
+  //-------------------------------    
+  // TRIGGER JETS                                                            
+  //-------------------------------  
+  // clear containers from previous event
+  vTrig_jets.clear() ; 
+
+  // jet containers, initialize here to avoid problems later
+  const xAOD::JetContainer* trigJets  = 0;
+
+  if( isData ){
+    // get the trigger jets containter (jets)
+    CHECK_STATUS(  Form("%s::execute",m_analysisName.c_str() ),
+		   eventStore->retrieve( trigJets, m_trigJetContainer.c_str() ) );
+
+    if( m_sd->DoPrint() ) 
+      printf("%s  :  %i  \n", m_recoJetContainer.c_str(), (int)recoJets->size() );
+   
+    SaveJets( m_jetPtMin, trigJets, vTrig_jets ); 
+  }
+
   return xAOD::TReturnCode::kSuccess;
 }
 

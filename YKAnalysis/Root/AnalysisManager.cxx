@@ -33,10 +33,11 @@
 YKAnalysis :: AnalysisManager :: AnalysisManager () 
   : m_analysisName  ( "" ),
     m_inputTreeName ( "" ),
-    m_eventChain    (NULL) 
-{ 
-  m_sd = new SharedData(); 
-}
+    m_outputFileName( "" ),
+    m_configFileName( "" ),
+    m_eventChain    (NULL),
+    m_sd            (NULL)
+{}
 
 
 /** @brief Constructor for AnalysisManager.
@@ -49,10 +50,11 @@ YKAnalysis :: AnalysisManager :: AnalysisManager ( const std::string& outputFile
 						   const std::string& configFileName ) 
   : m_analysisName  ( "runAnalysis" ), 
     m_inputTreeName ( "CollectionTree" ),
-    m_eventChain    (NULL) 
-{
-  m_sd             = new SharedData( outputFileName.c_str(), configFileName.c_str() );
-}
+    m_outputFileName( outputFileName ),
+    m_configFileName( configFileName ),
+    m_eventChain    (NULL),
+    m_sd            (NULL)
+{}
 
 /** @brief Destructor for AnalysisManager.
  *
@@ -77,7 +79,6 @@ YKAnalysis :: AnalysisManager :: ~AnalysisManager()
 int YKAnalysis :: AnalysisManager :: AddAnalysis ( AnalysisPtr ana )
 {
   m_v_analysis.push_back( ana );
-  m_v_analysis.back()->RegisterSharedData( m_sd );
   return xAOD::TReturnCode::kSuccess;
 }
 
@@ -95,8 +96,10 @@ int YKAnalysis :: AnalysisManager :: AddAnalysis ( AnalysisPtr ana )
 int YKAnalysis :: AnalysisManager :: Run () 
 {
   std::cout << m_analysisName << " Running" << std::endl;
-  
+
+  // Set up AnalysisManager, connect to event store
   CHECK_STATUS( Form("%s::Run", m_analysisName.c_str() ), Setup() );
+ 
   for( auto& ana : m_v_analysis ){
     CHECK_STATUS( Form("%s::Run", ana->GetAnalysisName().c_str() ), ana->Setup() );
     CHECK_STATUS( Form("%s::Run", ana->GetAnalysisName().c_str() ), ana->HistInitialize() );
@@ -112,7 +115,7 @@ int YKAnalysis :: AnalysisManager :: Run ()
     CHECK_STATUS( Form("%s::Run", ana->GetAnalysisName().c_str() ), ana->HistFinalize() );
   }
 
-  m_sd->Finalize();
+  if( m_sd ) m_sd->Finalize();
 
   return xAOD::TReturnCode::kSuccess;
 }
@@ -131,9 +134,22 @@ xAOD::TReturnCode YKAnalysis :: AnalysisManager :: Setup ()
   std::cout << m_analysisName << " Setup" << std::endl; 
 
   //-----------------
-  //  Initialize SD
+  //  Create &
+  //  Initialize SD 
   //-----------------
+  m_sd = new SharedData( m_outputFileName.c_str(), m_configFileName.c_str() );
   m_sd->Initialize();
+
+  // Register this with other analysis
+  for( auto& ana : m_v_analysis ){
+    ana->RegisterSharedData( m_sd ); 
+  }
+
+  //--------------------------------
+  //  Event Statistics Histogram
+  //--------------------------------
+  m_sd->GetEventStatistics()->GetXaxis()->SetBinLabel( 1, "Number Events" );
+  m_sd->GetEventStatistics()->GetXaxis()->SetBinLabel( 2, "Number Passed" );
 
   //-----------------
   //  Configs
@@ -187,6 +203,7 @@ xAOD::TReturnCode YKAnalysis :: AnalysisManager :: Setup ()
     m_eventChain->Add( inputFile.c_str() );
   }
 
+  // Get the event store, tell it to read from event chain
   xAOD::TEvent* eventStore = m_sd->GetEventStore();
   CHECK_STATUS( Form("%s::setup",m_analysisName.c_str() ),
 		eventStore->readFrom( m_eventChain ) );
@@ -215,21 +232,27 @@ xAOD::TReturnCode YKAnalysis :: AnalysisManager :: EventLoop ()
 
   // EVENT LOOP
   for( int ev = 0; ev < nevents; ev++ ){
-    bool isGoodEvent = true;
-
     eventStore->getEntry( ev );
     if( m_sd->DoPrint() ) std::cout << "\nSampleEvent : " << m_sd->GetEventCounter() << std::endl;
+    m_sd->GetEventStatistics()->Fill( "Number Events", 1 ); // total number of events
+
+    bool goodEvent = true;
 
     for( auto& ana : m_v_analysis ){ 
+      if( m_sd->DoPrint() ) std::cout << "Running " << ana->GetAnalysisName() << std::endl;
       if( ana->ProcessEvent() !=  xAOD::TReturnCode::kSuccess ) {
-	isGoodEvent = false;
+	goodEvent = false;
 	break;
       }
     }
+				
+    // Fill the passed event statistics if it was a good event
+    if( goodEvent ) m_sd->GetEventStatistics()->Fill( "Number Passed", 1 ); 
+	       
+    // If for whatever reason we had some non-kSuccess codes
+    // we dont not write the event to the tree
+    m_sd->EndOfEvent( goodEvent ); 
 
-    if( !isGoodEvent ) continue;
-
-    m_sd->EndOfEvent();
   } // END EVENT LOOP
 
   return xAOD::TReturnCode::kSuccess;
