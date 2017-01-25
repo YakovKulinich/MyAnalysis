@@ -79,8 +79,8 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: Setup ()
   m_truthJetContainer = config->GetValue( "truthJetContainer", "" );
   m_trigJetContainer  = config->GetValue( "trigJetContainer" , "" );
 
-  m_calibConfig       = config->GetValue( "calibConfig"  ,     "" );
-  m_calibSequence     = config->GetValue( "calibSequence",     "" );
+  m_calibConfig       = config->GetValue( "calibConfig"  , "JES_MC15c_HI_Nov2016.config" );
+  m_calibSequence     = config->GetValue( "calibSequence", "EtaJES_Insitu" );
  
   m_jetPtMin          = config->GetValue( "jetPtMin", 10 ) * 1000; // GeV
   m_jetRparameter     = config->GetValue( "jetRparameter", 0.4 ) ; 
@@ -146,29 +146,13 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: Initialize ()
   std::string jetAlgorithm   =  m_recoJetAlgorithm; //String describing your jet collection, 
   std::string config         =  m_calibConfig;      //Path to global config used to initialize the tool
   std::string calibSeq       =  m_calibSequence;    //String describing the calibration sequence to apply
-  bool isData                =  m_isData;            //bool describing if the events are data or from simulation
+  bool isData                =  m_isData;           //bool describing if the events are data or from simulation
 
   m_jetCalibrationTool = new JetCalibrationTool(name, jetAlgorithm, config, calibSeq, isData);
   m_jetCalibrationTool->msg().setLevel( MSG::DEBUG ); 
   // Initialize the tool
   CHECK_STATUS( Form("%s::initialize",m_analysisName.c_str() ),
 		m_jetCalibrationTool->initializeTool(name) );
-
-
-  // insitu calibration
-  TString jetAlgo_insitu = "AntiKt4EMTopo"; //String describing your calibration
-  TString config_insitu = 
-    "JES_2015dataset_recommendation_Feb2016.config"; //Path to global config 
-  const std::string name_insitu = "insitu"; //string describing the current thread
-  TString calibSeq_insitu = "Insitu_DEV"  ; //String describing the calib sequence 
-  
-  
-  m_jetCalibration_insitu = 
-    new JetCalibrationTool(name_insitu, jetAlgo_insitu, 
-			   config_insitu, calibSeq_insitu, true);
-  // initialize the tool
-  CHECK_STATUS( Form("%s::initialize",m_analysisName.c_str() ),
-		m_jetCalibration_insitu->initializeTool(name_insitu));
 
   return xAOD::TReturnCode::kSuccess;
 }
@@ -247,13 +231,6 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
     CHECK_STATUS( Form("%s::execute",m_analysisName.c_str() ),
 		  m_jetCalibrationTool->applyCalibration( *newjet ) ); 
 
-    //Insitu corrections, need to be done at GSW scale
-    const xAOD::JetFourMom_t jet_4mom_xcalib = newjet->jetP4();
-    newjet->setJetP4("JetGSCScaleMomentum", jet_4mom_xcalib);
-    
-    if( isData ){ CHECK_STATUS( Form("%s::execute",m_analysisName.c_str() ), 
-				m_jetCalibration_insitu->applyCalibration( *newjet ) );
-    }  
   } // end for loop over jets
  
   if( m_sd->DoPrint() )

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 USERNAME=ykulinic
-CONFIG=config/configJetsGridFwd.cfg
+CONFIG=config/configJetsFwd_pp.cfg
 DATE=`date --utc '+20%y%m%d.%H%M'`
 BLACKLIST=
 

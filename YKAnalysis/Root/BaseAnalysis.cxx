@@ -214,7 +214,7 @@ xAOD::TReturnCode YKAnalysis :: BaseAnalysis :: ProcessEvent(){
     isMC = true; // can use this later
   }
 
-  int runNumber = eventInfo->runNumber();
+  m_runNumber   = eventInfo->runNumber();
 
   m_eventNumber = eventInfo->eventNumber();
   m_LBN         = eventInfo->lumiBlock();
