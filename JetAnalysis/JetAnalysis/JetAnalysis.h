@@ -85,7 +85,6 @@ namespace JetAnalysis{
     // tools
     JetCleaningTool*    m_jetCleaningTool;    
     JetCalibrationTool* m_jetCalibrationTool; 
-    JetCalibrationTool* m_jetCalibration_insitu;
 
     // cuts
     float m_jetPtMin ;

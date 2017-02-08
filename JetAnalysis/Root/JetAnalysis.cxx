@@ -139,16 +139,26 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: Initialize ()
   CHECK_STATUS( Form("%s::initialize",m_analysisName.c_str() ),
 	       m_jetCleaningTool->setProperty("DoUgly", false));
   CHECK_STATUS( Form("%s::initialize",m_analysisName.c_str() ),
-	       m_jetCleaningTool->initialize());
+	       m_jetCleaningTool->initialize() );
 
   // Jet Calibration
-  const std::string name = "JetAnalysis"; //string describing the current thread, for logging
-  std::string jetAlgorithm   =  m_recoJetAlgorithm; //String describing your jet collection, 
-  std::string config         =  m_calibConfig;      //Path to global config used to initialize the tool
-  std::string calibSeq       =  m_calibSequence;    //String describing the calibration sequence to apply
-  bool isData                =  m_isData;           //bool describing if the events are data or from simulation
+  const std::string name    = "JetAnalysis";       //string describing the current thread, for logging
+  std::string jetAlgorithm  =  m_recoJetAlgorithm; //String describing your jet collection, 
+  std::string config        =  m_calibConfig;      //Path to global config used to initialize the tool
+  std::string calibSeq      =  m_calibSequence;    //String describing the calibration sequence to apply
+  bool isData               =  m_isData;           //bool describing if the events are data or from simulation
 
-  m_jetCalibrationTool = new JetCalibrationTool(name, jetAlgorithm, config, calibSeq, isData);
+  // Call constructor
+  m_jetCalibrationTool = new JetCalibrationTool(name);
+  // Set properties
+  CHECK_STATUS( Form("%s::initialize",m_analysisName.c_str() ),
+		m_jetCalibrationTool->setProperty( "JetCollection", jetAlgorithm ) );
+  CHECK_STATUS( Form("%s::initialize",m_analysisName.c_str() ),
+		m_jetCalibrationTool->setProperty( "ConfigFile", config ) );
+  CHECK_STATUS( Form("%s::initialize",m_analysisName.c_str() ),
+		m_jetCalibrationTool->setProperty( "CalibSequence", calibSeq ) );
+  CHECK_STATUS( Form("%s::initialize",m_analysisName.c_str() ),
+		m_jetCalibrationTool->setProperty( "IsData", isData ) );
   m_jetCalibrationTool->msg().setLevel( MSG::DEBUG ); 
   // Initialize the tool
   CHECK_STATUS( Form("%s::initialize",m_analysisName.c_str() ),
