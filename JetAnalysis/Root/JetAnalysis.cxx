@@ -409,7 +409,7 @@ void JetAnalysis :: JetAnalysis :: SaveJets(  float pTmin,
   int nSavedJets = 0;
 
   for( const auto* jet : *jets ){
-    const xAOD::JetFourMom_t jetP4 = jet->jetP4( scale );
+    const xAOD::JetFourMom_t jetP4 = (*jet)->jetP4( scale );
 
     if( jetP4.pt() < pTmin ) continue;
 
