@@ -102,9 +102,12 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: HistInitialize ()
 
   // Reco jets  
   m_sd->AddOutputToTree< std::vector<TLorentzVector> >("vR_C_jets"  , &vR_C_jets );
-  m_sd->AddOutputToTree< std::vector<TLorentzVector> >("vR_DF_jets" , &vR_DF_jets);
-  m_sd->AddOutputToTree< std::vector<TLorentzVector> >("vR_EM_jets" , &vR_EM_jets);
   
+  /*
+    m_sd->AddOutputToTree< std::vector<TLorentzVector> >("vR_DF_jets" , &vR_DF_jets);
+    m_sd->AddOutputToTree< std::vector<TLorentzVector> >("vR_EM_jets" , &vR_EM_jets);
+  */
+
   // Truth jets. Only in MC
   if( !m_isData ){
     m_sd->AddOutputToTree< std::vector<TLorentzVector> >("vT_jets" , &vT_jets);
