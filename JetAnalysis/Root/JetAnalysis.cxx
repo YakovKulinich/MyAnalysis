@@ -411,8 +411,8 @@ void JetAnalysis :: JetAnalysis :: SaveJets(  float pTmin,
 					      const std::string& scale ){
   int nSavedJets = 0;
 
-  for( const auto* jet : *jets ){
-    const xAOD::JetFourMom_t jetP4 = (*jet)->jetP4( scale );
+  for( const auto& jet : *jets ){
+    const xAOD::JetFourMom_t jetP4 = jet->jetP4( scale );
 
     if( jetP4.pt() < pTmin ) continue;
 
