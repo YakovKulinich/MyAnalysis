@@ -227,7 +227,7 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
 
   std::vector<bool> vTemp_isCleanJet;
 
-  for( const auto* jet : *recoJets ){
+  for( const auto& jet : *recoJets ){
   
     if( m_jetCleaningTool->accept( *jet ) ) vTemp_isCleanJet.push_back(true);
     else vTemp_isCleanJet.push_back(false);
@@ -391,7 +391,7 @@ void JetAnalysis :: JetAnalysis :: SaveJets(  float pTmin,
 					      std::vector<TLorentzVector>& v_jets  ){
   int nSavedJets = 0;
   
-  for( const auto* jet : *jets ){
+  for( const auto& jet : *jets ){
     const xAOD::JetFourMom_t jetP4 = jet->jetP4();
 
     if( jetP4.pt() < pTmin ) continue;
