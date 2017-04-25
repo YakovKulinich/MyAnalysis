@@ -286,7 +286,7 @@ xAOD::TReturnCode YKAnalysis :: BaseAnalysis :: ProcessEvent(){
     m_sd->GetEventStatistics()->Fill( "Vertex Reject", 1 );  // vertex reject
     return xAOD::TReturnCode::kRecoverable; // goto next event
   }
-
+ 
   //---------------------
   // DAQ Errors
   //---------------------
