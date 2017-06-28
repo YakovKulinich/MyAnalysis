@@ -15,18 +15,20 @@
 #include <vector>
 #include <string>
 
-#include "YKAnalysis/SharedData.h"
-#include "YKAnalysis/HelperFunctions.h"
+#include <YKAnalysis/SharedData.h>
+#include <YKAnalysis/HelperFunctions.h>
 
-#include "xAODRootAccess/Init.h"
-#include "xAODRootAccess/TEvent.h"
-#include "xAODRootAccess/TStore.h"
-#include "xAODRootAccess/TActiveStore.h"
-#include "xAODRootAccess/tools/Message.h"
-#include "xAODRootAccess/tools/ReturnCheck.h"
+#include <xAODRootAccess/Init.h>
+#include <xAODRootAccess/TEvent.h>
+#include <xAODRootAccess/TStore.h>
+#include <xAODRootAccess/TActiveStore.h>
+#include <xAODRootAccess/tools/Message.h>
+#include <xAODRootAccess/tools/ReturnCheck.h>
 
-#include "AsgTools/ToolHandle.h"
-#include "AsgTools/MessageCheck.h"
+#include <xAODEventInfo/EventInfo.h>
+
+#include <AsgTools/ToolHandle.h>
+#include <AsgTools/MessageCheck.h>
 
 class TEnv;
 class TChain;

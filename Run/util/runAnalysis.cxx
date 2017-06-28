@@ -15,6 +15,7 @@
 #include "YKAnalysis/BaseAnalysis.h"
 #include "ClusterAnalysis/FluctuationAnalysis.h"
 #include "JetAnalysis/JetAnalysis.h"
+#include "OverlayAnalysis/OverlayAnalysis.h"
 
 #include <TString.h>
 
@@ -42,14 +43,16 @@ int main( int argc, char* argv[] ){
   // If you do add it, add it first, because it has event selection -
   // things like trigger decision, and you dont want to run the other 
   // analysis in case you dont pass trigger (or maybe you do, depends)
-  manager->AddAnalysis( make_shared<YKAnalysis::BaseAnalysis>() );
+  //  manager->AddAnalysis( make_shared<YKAnalysis::BaseAnalysis>() );
 
   // should add JetAnalysis. 
-  manager->AddAnalysis( make_shared<JetAnalysis::JetAnalysis>() );
+  // manager->AddAnalysis( make_shared<JetAnalysis::JetAnalysis>() );
 
   // should add FluctuationAnalysis. 
   // manager->AddAnalysis( make_shared<ClusterAnalysis::FluctuationAnalysis>() );
 
+  // overlay analysis
+  manager->AddAnalysis( make_shared<OverlayAnalysis::OverlayAnalysis>() );
 
   // Run
   manager->SetMaxEvents( 5000 );
