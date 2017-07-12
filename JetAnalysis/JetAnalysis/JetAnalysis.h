@@ -20,6 +20,8 @@ class JetContainer;
 
 class JetCleaningTool;
 class JetCalibrationTool;
+class JetUncertaintiesTool;
+class HIJESUncertaintyProvider;
 
 namespace JetAnalysis{
   
@@ -38,42 +40,37 @@ namespace JetAnalysis{
     virtual xAOD::TReturnCode Finalize       ();
     virtual xAOD::TReturnCode HistFinalize   ();
 
-    virtual Float_t DeltaR( const xAOD::Jet* ,   
-			    const xAOD::Jet* );
+    void UncertaintyProviderJES( const xAOD::Jet*,
+				 std::vector<float>& );
 
-    // save just the reco jets
-    virtual void SaveJets( float                     ,  
-			   const xAOD::JetContainer* , // reco
-			   const xAOD::JetContainer* , // calib reco	
-			   std::vector<bool>&            , // jetCleaning 
-			   std::vector<TLorentzVector>&  , // default output
-			   std::vector<TLorentzVector>&  , // em output
-			   std::vector<TLorentzVector>&  , // calib output
-			   std::vector<bool>&            );// jetCleaning output
-  
-    virtual void SaveJets( float                          ,
-			   const xAOD::JetContainer *     ,   // reco
-			   std::vector<TLorentzVector>&   );  // reco output vector  
-
-    virtual void SaveJets( float                          ,  
-			   const xAOD::JetContainer *     ,   // reco
-			   std::vector<TLorentzVector>&   ,   // reco output vector  
-			   const std::string&             );
+    Float_t DeltaR( const xAOD::Jet* ,   
+		    const xAOD::Jet* );
+    
+    void SaveJets( const xAOD::JetContainer* ,     // jets
+		   std::vector<TLorentzVector>&,   // calib output
+		   float = 0 );                    // cut 
+		    
+    void SaveJets( const xAOD::JetContainer*    ,  // jets
+		   std::vector<TLorentzVector>& ,  // jets output vector
+		   const std::string&           ,  // scale 
+		   float = 0 );                    // cut 
 
   private:
     // For tree
-    std::vector<TLorentzVector> vR_C_jets;    
-    std::vector<TLorentzVector> vR_EM_jets;   
-    std::vector<TLorentzVector> vR_DF_jets;   
+    std::vector< TLorentzVector > vR_C_jets;    
+    std::vector< TLorentzVector > vT_jets;      
+    std::vector< TLorentzVector > vTrig_jets;   
 
-    std::vector<TLorentzVector> vT_jets;      
+    std::vector< std::vector< float > > vSys_unc;
+    int m_nSys_unc;
+    int m_nSys_unc_pp;
+    int m_nSys_unc_HI;
 
-    std::vector<bool>           v_isCleanJet; 
-
-    std::vector<TLorentzVector> vTrig_jets;   
+    std::vector< bool > v_isCleanJet; 
 
     // configs
-    bool        m_isData;
+    bool        m_isData        ;
+    bool        m_doSystematics ;
     std::string m_recoJetAlgorithm  ; 
     std::string m_recoJetContainer  ; 
     std::string m_truthJetContainer ;
@@ -83,9 +80,11 @@ namespace JetAnalysis{
     std::string m_calibSequence     ;    
  
     // tools
-    JetCleaningTool*    m_jetCleaningTool;    
-    JetCalibrationTool* m_jetCalibrationTool; 
-
+    JetCleaningTool*          m_jetCleaningTool;    
+    JetCalibrationTool*       m_jetCalibrationTool; 
+    JetUncertaintiesTool*     m_jetUncertaintyTool;
+    HIJESUncertaintyProvider* m_hiJetUncertaintyTool;
+    
     // cuts
     float m_jetPtMin ;
     float m_jetRparameter ;

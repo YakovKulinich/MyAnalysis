@@ -13,25 +13,21 @@
 
 #include <xAODJet/JetContainer.h>
 #include <xAODCore/AuxContainerBase.h>
-
 #include <xAODTruth/TruthEventContainer.h>
 #include <xAODTruth/TruthParticleContainer.h>
 
 #include <JetSelectorTools/JetCleaningTool.h>
-
 #include <JetCalibTools/JetCalibrationTool.h>
+#include <JetUncertainties/JetUncertaintiesTool.h>
+#include <JetAnalysis/HIJESUncertaintyProvider.h>
 
 #include <TMath.h>
 
 /** @brief Default Constructor for Fluctuation Analysis.
  */
 JetAnalysis :: JetAnalysis :: JetAnalysis () 
-  : Analysis ( "JetAnalysis" )
-{
-  // tools
-  m_jetCleaningTool    = NULL;
-  m_jetCalibrationTool = NULL; 
-}
+  : JetAnalysis ( "JetAnalysis" )
+{}
 
 
 /** @brief  Constructor for Fluctuation Analysis.
@@ -44,6 +40,8 @@ JetAnalysis :: JetAnalysis :: JetAnalysis ( const std::string& name  )
   // tools
   m_jetCleaningTool    = NULL;
   m_jetCalibrationTool = NULL; 
+  m_jetUncertaintyTool   = NULL;
+  m_hiJetUncertaintyTool = NULL; 
 }
 
 /** @brief Destructor for Fluctuation Analysis.
@@ -55,8 +53,12 @@ JetAnalysis :: JetAnalysis :: ~JetAnalysis()
   // tools
   delete m_jetCleaningTool;
   delete m_jetCalibrationTool;
-  m_jetCleaningTool    = NULL;
-  m_jetCalibrationTool = NULL;  
+  delete m_jetUncertaintyTool;
+  delete m_hiJetUncertaintyTool;
+  m_jetCleaningTool      = NULL;
+  m_jetCalibrationTool   = NULL;
+  m_jetUncertaintyTool   = NULL;
+  m_hiJetUncertaintyTool = NULL; 
 }
 
 /** @brief Setup method for Jet Analysis
@@ -72,7 +74,8 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: Setup ()
   //-----------------
   TEnv* config = m_sd->GetConfig();
 
-  m_isData            = config->GetValue( "isData", false );
+  m_isData            = config->GetValue( "isData"       , false );
+  m_doSystematics     = config->GetValue( "doSystematics", false );
 
   m_recoJetAlgorithm  = config->GetValue( "recoJetAlgorithm" , "" );
   m_recoJetContainer  = config->GetValue( "recoJetContainer" , "" );
@@ -82,8 +85,12 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: Setup ()
   m_calibConfig       = config->GetValue( "calibConfig"  , "JES_MC15c_HI_Nov2016.config" );
   m_calibSequence     = config->GetValue( "calibSequence", "EtaJES_Insitu" );
  
-  m_jetPtMin          = config->GetValue( "jetPtMin", 10 ) * 1000; // GeV
+  m_jetPtMin          = config->GetValue( "jetPtMin", 10 ) * 1000; // MeV
   m_jetRparameter     = config->GetValue( "jetRparameter", 0.4 ) ; 
+
+  m_nSys_unc       = config->GetValue( "nSystematics"   , 19 );
+  m_nSys_unc_pp    = config->GetValue( "nSystematics_pp", 17 );
+  m_nSys_unc_HI    = config->GetValue( "nSystematics_HI", 2  );
 
   return xAOD::TReturnCode::kSuccess;
 }
@@ -101,24 +108,26 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: HistInitialize ()
   std::cout << m_analysisName << " HistInitialize" << std::endl;
 
   // Reco jets  
-  m_sd->AddOutputToTree< std::vector<TLorentzVector> >("vR_C_jets"  , &vR_C_jets );
-  
-  /*
-    m_sd->AddOutputToTree< std::vector<TLorentzVector> >("vR_DF_jets" , &vR_DF_jets);
-    m_sd->AddOutputToTree< std::vector<TLorentzVector> >("vR_EM_jets" , &vR_EM_jets);
-  */
+  m_sd->AddOutputToTree< std::vector<TLorentzVector> >
+    ("vR_C_jets"  , &vR_C_jets );
 
   // Truth jets. Only in MC
-  if( !m_isData ){
-    m_sd->AddOutputToTree< std::vector<TLorentzVector> >("vT_jets" , &vT_jets);
-  }
+  if( !m_isData )
+    {m_sd->AddOutputToTree< std::vector<TLorentzVector> >
+	("vT_jets" , &vT_jets); }
 
-  m_sd->AddOutputToTree< std::vector<bool> >("v_isCleanJet", &v_isCleanJet );
+  m_sd->AddOutputToTree< std::vector<bool> >
+    ("v_isCleanJet", &v_isCleanJet );
 
   // Trigger jets. Only in Data
-  if( m_isData ){
-    m_sd->AddOutputToTree< std::vector<TLorentzVector> >("vTrig_jets" , &vTrig_jets);
-  }
+  if( m_isData )
+    { m_sd->AddOutputToTree< std::vector<TLorentzVector> >
+	("vTrig_jets" , &vTrig_jets); }
+
+  // add uncertainty unc
+  if( !m_isData )
+    { m_sd->AddOutputToTree< std::vector<std::vector<float> > >
+	("vSys_unc", &vSys_unc); }
 
   return xAOD::TReturnCode::kSuccess;
 }
@@ -134,17 +143,16 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: Initialize ()
 {
   std::cout << m_analysisName << " Initializing" << std::endl;
 
-  // Jet Cleaning
+  const char* statusL = Form("%s::initialize",m_analysisName.c_str() ); 
+
+  // ----- Jet Cleaning
   m_jetCleaningTool = new JetCleaningTool("JetCleaning");
   m_jetCleaningTool->msg().setLevel( MSG::DEBUG ); 
-  CHECK_STATUS( Form("%s::initialize",m_analysisName.c_str() ),
-		m_jetCleaningTool->setProperty( "CutLevel", "LooseBad"));
-  CHECK_STATUS( Form("%s::initialize",m_analysisName.c_str() ),
-	       m_jetCleaningTool->setProperty("DoUgly", false));
-  CHECK_STATUS( Form("%s::initialize",m_analysisName.c_str() ),
-	       m_jetCleaningTool->initialize() );
+  CHECK_STATUS( statusL, m_jetCleaningTool->setProperty( "CutLevel", "LooseBad"));
+  CHECK_STATUS( statusL, m_jetCleaningTool->setProperty("DoUgly", false));
+  CHECK_STATUS( statusL, m_jetCleaningTool->initialize() );
 
-  // Jet Calibration
+  // ----- Jet Calibration
   const std::string name    = "JetAnalysis";       //string describing the current thread, for logging
   std::string jetAlgorithm  =  m_recoJetAlgorithm; //String describing your jet collection, 
   std::string config        =  m_calibConfig;      //Path to global config used to initialize the tool
@@ -154,18 +162,29 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: Initialize ()
   // Call constructor
   m_jetCalibrationTool = new JetCalibrationTool(name);
   // Set properties
-  CHECK_STATUS( Form("%s::initialize",m_analysisName.c_str() ),
-		m_jetCalibrationTool->setProperty( "JetCollection", jetAlgorithm ) );
-  CHECK_STATUS( Form("%s::initialize",m_analysisName.c_str() ),
-		m_jetCalibrationTool->setProperty( "ConfigFile", config ) );
-  CHECK_STATUS( Form("%s::initialize",m_analysisName.c_str() ),
-		m_jetCalibrationTool->setProperty( "CalibSequence", calibSeq ) );
-  CHECK_STATUS( Form("%s::initialize",m_analysisName.c_str() ),
-		m_jetCalibrationTool->setProperty( "IsData", isData ) );
+  CHECK_STATUS( statusL, m_jetCalibrationTool->setProperty( "JetCollection", jetAlgorithm ) );
+  CHECK_STATUS( statusL, m_jetCalibrationTool->setProperty( "ConfigFile", config ) );
+  CHECK_STATUS( statusL, m_jetCalibrationTool->setProperty( "CalibSequence", calibSeq ) );
+  CHECK_STATUS( statusL, m_jetCalibrationTool->setProperty( "IsData", isData ) );
   m_jetCalibrationTool->msg().setLevel( MSG::DEBUG ); 
   // Initialize the tool
-  CHECK_STATUS( Form("%s::initialize",m_analysisName.c_str() ),
-		m_jetCalibrationTool->initializeTool(name) );
+  CHECK_STATUS( statusL, m_jetCalibrationTool->initializeTool(name) );
+
+  // ----- JES (pp)
+  // Call Constructor
+  m_jetUncertaintyTool = new JetUncertaintiesTool();
+  CHECK_STATUS( statusL, m_jetUncertaintyTool->setProperty("JetDefinition","AntiKt4EMTopo") );
+  CHECK_STATUS( statusL, m_jetUncertaintyTool->setProperty("MCType","MC15") );
+  CHECK_STATUS( statusL, m_jetUncertaintyTool->setProperty
+		("ConfigFile","JES_2015/ICHEP2016/JES2015_19NP.config") );
+  // Initialize the tool
+  CHECK_STATUS( statusL, m_jetUncertaintyTool->initialize() );
+
+  // ----- JES (HI)
+  // Call Constructor
+  m_hiJetUncertaintyTool = new HIJESUncertaintyProvider("HIJESUncert_data15_5TeV.root");
+  m_hiJetUncertaintyTool->UseJESTool(true);
+  m_hiJetUncertaintyTool->UseGeV(false);
 
   return xAOD::TReturnCode::kSuccess;
 }
@@ -178,12 +197,12 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: Initialize ()
 xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
   xAOD::TEvent* eventStore = m_sd->GetEventStore();
 
+  const char* statusL = Form("%s::execute",m_analysisName.c_str() );
   //---------------------
   // EVENT INFO
   //---------------------
   const xAOD::EventInfo* eventInfo = 0;
-  CHECK_STATUS( Form("%s::execute",m_analysisName.c_str() ),
-		eventStore->retrieve( eventInfo, "EventInfo") );
+  CHECK_STATUS( statusL, eventStore->retrieve( eventInfo, "EventInfo") );
 
   // check if the event is MC or data
   // (many tools are either for MC or data)
@@ -199,62 +218,64 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
   // JETS                                                            
   //-------------------------------  
   // clear containers from previous event
-  vT_jets.clear() ; 
-
-  vR_C_jets.clear() ;
-  vR_EM_jets.clear() ; 
-  vR_DF_jets.clear() ; 
-
-  v_isCleanJet.clear() ;
+  vR_C_jets.clear();
+  vT_jets  .clear(); 
+  vSys_unc .clear();
+  
+  v_isCleanJet.clear();
 
   // jet containers, initialize here to avoid problems later
   const xAOD::JetContainer* recoJets  = 0;
   const xAOD::JetContainer* truthJets = 0;
 
   // get the reconstructed containter (jets)
-  CHECK_STATUS(  Form("%s::execute",m_analysisName.c_str() ),
-		 eventStore->retrieve( recoJets, m_recoJetContainer.c_str() ) );
+  CHECK_STATUS( statusL, eventStore->retrieve( recoJets, m_recoJetContainer.c_str() ) );
 
   if( m_sd->DoPrint() ) 
-    printf("%s  :  %i  \n", m_recoJetContainer.c_str(), (int)recoJets->size() );
+    printf("%s  :  %i", m_recoJetContainer.c_str(), (int)recoJets->size() );
   
-  int numGoodJets = 0;
-
   // Create the new container and its auxiliary store.
   xAOD::JetContainer*     calibRecoJets    = new xAOD::JetContainer();
   xAOD::AuxContainerBase* calibRecoJetsAux = new xAOD::AuxContainerBase();
   calibRecoJets->setStore( calibRecoJetsAux ); //< Connect the two
 
   std::vector<bool> vTemp_isCleanJet;
+  std::vector< std::vector< float > > vTemp_sys_unc;
 
   for( const auto& jet : *recoJets ){
-  
-    if( m_jetCleaningTool->accept( *jet ) ) vTemp_isCleanJet.push_back(true);
-    else vTemp_isCleanJet.push_back(false);
-    numGoodJets++;
+    bool isCleanJet = m_jetCleaningTool->accept( *jet );
     
-    xAOD::Jet* newjet = new xAOD::Jet();
-    newjet->makePrivateStore( *jet );
+    xAOD::Jet* newJet = new xAOD::Jet();
+    newJet->makePrivateStore( *jet );
 
-    const xAOD::JetFourMom_t pileupscale_jetP4 = newjet->jetP4("JetEMScaleMomentum");
-    newjet->setJetP4( "JetPileupScaleMomentum", pileupscale_jetP4 );
-
-    calibRecoJets->push_back( newjet );
+    const xAOD::JetFourMom_t pileupscale_jetP4 = newJet->jetP4("JetEMScaleMomentum");
+    newJet->setJetP4( "JetPileupScaleMomentum", pileupscale_jetP4 );
     
-    CHECK_STATUS( Form("%s::execute",m_analysisName.c_str() ),
-		  m_jetCalibrationTool->applyCalibration( *newjet ) ); 
+    CHECK_STATUS( statusL, m_jetCalibrationTool->applyCalibration( *newJet ) ); 
 
-  } // end for loop over jets
+    // if the calibrated pT is less than a cut, dont
+    // save or do anything else with this jet 
+    if( newJet->jetP4().pt() < m_jetPtMin ){ continue; }
+
+    calibRecoJets->push_back( newJet );
+    v_isCleanJet.push_back( isCleanJet );
+
+    // do systematic uncertainties
+    if( isMC && m_doSystematics ){
+      std::vector< float > jet_sys_unc;
+      jet_sys_unc.reserve( m_nSys_unc );
+      UncertaintyProviderJES( newJet, jet_sys_unc );
+      vSys_unc.push_back( jet_sys_unc );
+    }
+  }// end for loop over jets
  
-  if( m_sd->DoPrint() )
-    printf("\nNum Good %s Jets : %i\n", m_recoJetContainer.c_str(), numGoodJets);
-
-  if( isMC ){ // get the truth containter (jets)
-    CHECK_STATUS( Form("%s::execute",m_analysisName.c_str() ), 
-		  eventStore->retrieve( truthJets, m_truthJetContainer.c_str() ) );
+  // get the truth containter (jets)
+  if( isMC ){
+    CHECK_STATUS
+      ( statusL, eventStore->retrieve( truthJets, m_truthJetContainer.c_str() ) );
     
     if( m_sd->DoPrint() )
-      printf("\n%s  :  %i \n", m_truthJetContainer.c_str(), (int)truthJets->size() );
+      { printf("\n%s  :  %i", m_truthJetContainer.c_str(), (int)truthJets->size()); }
   }
 
   //-------------------------------
@@ -262,15 +283,13 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
   // MC
   // Save Truth and Reco
   if( isMC ){
-    SaveJets( m_jetPtMin, recoJets, calibRecoJets, vTemp_isCleanJet,
-	      vR_DF_jets, vR_EM_jets, vR_C_jets, v_isCleanJet );
-    SaveJets( m_jetPtMin, truthJets, vT_jets ); 
+    SaveJets( calibRecoJets, vR_C_jets );
+    SaveJets( truthJets, vT_jets, m_jetPtMin ); 
   } 			
   // DATA
   // no pairing for data since no truth jets just save them
   else if( isData ){
-    SaveJets( m_jetPtMin, recoJets, calibRecoJets, vTemp_isCleanJet,
-	      vR_DF_jets, vR_EM_jets, vR_C_jets, v_isCleanJet );
+    SaveJets( calibRecoJets, vR_C_jets );
   } 
   
   // delete the deep copies
@@ -290,14 +309,29 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
 
   if( isData ){
     // get the trigger jets containter (jets)
-    CHECK_STATUS(  Form("%s::execute",m_analysisName.c_str() ),
-		   eventStore->retrieve( trigJets, m_trigJetContainer.c_str() ) );
+    CHECK_STATUS
+      (  statusL, eventStore->retrieve( trigJets, m_trigJetContainer.c_str() ) );
 
     if( m_sd->DoPrint() ) 
-      printf("%s  :  %i  \n", m_recoJetContainer.c_str(), (int)recoJets->size() );
+      printf("%s  :  %i", m_recoJetContainer.c_str(), (int)recoJets->size() );
    
-    SaveJets( m_jetPtMin, trigJets, vTrig_jets ); 
+    SaveJets( trigJets, vTrig_jets, m_jetPtMin ); 
   }
+
+  /*
+  if( m_sd->DoPrint() ){
+    std::cout << "\nHave " << vR_C_jets.size() << " calibrated Jets" << std::endl;
+    std::cout <<   "Have " << vT_jets.size()   << " truth Jets" << std::endl;
+    int counter = 0;
+    for( auto & v : vSys_unc ){
+      std::cout << "jet " << counter++ << " : " << std::endl; 
+      int sys = 0;
+      for( auto & s : v ){
+	std::cout << sys++ << " > " << s << std::endl;
+      }
+    }
+  }
+  */
 
   return xAOD::TReturnCode::kSuccess;
 }
@@ -315,8 +349,12 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: Finalize()
   // tools
   delete m_jetCleaningTool;
   delete m_jetCalibrationTool;
-  m_jetCleaningTool    = NULL;
-  m_jetCalibrationTool = NULL; 
+  delete m_jetUncertaintyTool;
+  delete m_hiJetUncertaintyTool;
+  m_jetCleaningTool      = NULL;
+  m_jetCalibrationTool   = NULL; 
+  m_jetUncertaintyTool   = NULL;
+  m_hiJetUncertaintyTool = NULL;
 
   return xAOD::TReturnCode::kSuccess;
 }
@@ -334,7 +372,42 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: HistFinalize()
   return xAOD::TReturnCode::kSuccess;
 }
 
+void JetAnalysis :: JetAnalysis :: UncertaintyProviderJES
+( const xAOD::Jet* jet,
+  std::vector<float>& v_unc ){
 
+  for( int component = 0; component < m_nSys_unc; component++ ){
+    double jetPt  = jet->pt();
+    double jetEta = jet->eta();
+    
+    float uncertainty = 0;
+    // if a pp factor, just use this, and continue to next
+    if( component < m_nSys_unc_pp ){ 
+      uncertainty = m_jetUncertaintyTool->getUncertainty( component,(*jet) );
+      v_unc.push_back( uncertainty );
+      continue; 
+    }
+
+    // if not a standard pp uncertainty, do more 
+    float HIJESuncertainty = 0;
+    if ( component == m_nSys_unc_pp ){
+      HIJESuncertainty = 
+	sqrt(pow( m_hiJetUncertaintyTool->GetUncertaintyComponent
+		 ("flav_composition",jetPt, jetEta),2) + 
+	     pow( m_hiJetUncertaintyTool->GetUncertaintyComponent
+		 ("flav_response",jetPt, jetEta),2));
+    } else if ( component == m_nSys_unc_pp + 1 ) {
+      /*
+	HIJESuncertainty = m_hiJetUncertaintyTool->
+	GetHIJESHisto( jetEta )->Interpolate( jetPt/1000.);
+      */
+      // for now, the above doesnt work. histograms are bad
+      HIJESuncertainty = 0;
+    }
+   
+    v_unc.push_back( HIJESuncertainty );
+  }
+}
 
 // calculate deltaR = sqrt( deltaphi^2 + deltaeta^2)
 Float_t JetAnalysis :: JetAnalysis :: DeltaR( const xAOD::Jet* jet1 , 
@@ -347,77 +420,26 @@ Float_t JetAnalysis :: JetAnalysis :: DeltaR( const xAOD::Jet* jet1 ,
   return TMath::Sqrt( deltaEta*deltaEta + deltaPhi*deltaPhi );
 }
 
-
-// save just the reco jets
-void JetAnalysis :: JetAnalysis :: SaveJets(  float pTmin,  
-					      const xAOD::JetContainer * recoJets,
-					      const xAOD::JetContainer * calibRecoJets,	
-					      std::vector<bool>&           vTemp_isCleanJet,
-					      std::vector<TLorentzVector>& vR_DF_jets,
-					      std::vector<TLorentzVector>& vR_EM_jets,
-					      std::vector<TLorentzVector>& vR_C_jets ,
-					      std::vector<bool>&           v_isCleanJet  ){
-  
-  int nSavedJets = 0;
-
-  for( unsigned int iJet = 0; iJet < recoJets->size(); iJet++){ 
-    const xAOD::JetFourMom_t calibJetP4 = calibRecoJets->at(iJet)->jetP4();
-    
-    if( calibJetP4.pt() < pTmin ) continue;
-  
-    const xAOD::JetFourMom_t defaultJetP4 = recoJets->at(iJet)->jetP4();
-    const xAOD::JetFourMom_t emScaleJetP4 = recoJets->at(iJet)->jetP4("JetEMScaleMomentum");
-  
-    vR_DF_jets.push_back( TLorentzVector( defaultJetP4.px(), defaultJetP4.py(), 
-					  defaultJetP4.pz(), defaultJetP4.e() ) );  
-
-    vR_EM_jets.push_back( TLorentzVector( emScaleJetP4.px(), emScaleJetP4.py(), 
-					  emScaleJetP4.pz(), emScaleJetP4.e() ) );  
-
-    vR_C_jets.push_back ( TLorentzVector( calibJetP4.px(), calibJetP4.py(), 
-					  calibJetP4.pz(), calibJetP4.e() ) );
-
-    v_isCleanJet.push_back( vTemp_isCleanJet.at(iJet) );
-  
-    nSavedJets++;
-  }
-  
-}
-
-
 // save the jets
-void JetAnalysis :: JetAnalysis :: SaveJets(  float pTmin,  
-					      const xAOD::JetContainer * jets , 
-					      std::vector<TLorentzVector>& v_jets  ){
-  int nSavedJets = 0;
-  
+void JetAnalysis :: JetAnalysis :: SaveJets(  const xAOD::JetContainer* jets , 
+					      std::vector<TLorentzVector>& v_jets,
+					      float pTmin ){
   for( const auto& jet : *jets ){
     const xAOD::JetFourMom_t jetP4 = jet->jetP4();
-
     if( jetP4.pt() < pTmin ) continue;
-
-    v_jets.push_back( TLorentzVector( jetP4.px(), jetP4.py(), 
-				      jetP4.pz(), jetP4.e() ) ); 
-  
-    nSavedJets++;
+    v_jets.push_back( TLorentzVector( jetP4.px(), jetP4.py(), jetP4.pz(), jetP4.e() ) ); 
   }
 }
 
 
 // save the jets
-void JetAnalysis :: JetAnalysis :: SaveJets(  float pTmin,  
-					      const xAOD::JetContainer * jets , 
-					      std::vector<TLorentzVector>& v_jets ,
-					      const std::string& scale ){
-  int nSavedJets = 0;
-
+void JetAnalysis :: JetAnalysis :: SaveJets( const xAOD::JetContainer* jets , 
+					     std::vector<TLorentzVector>& v_jets ,
+					     const std::string& scale,
+					     float pTmin ){
   for( const auto& jet : *jets ){
     const xAOD::JetFourMom_t jetP4 = jet->jetP4( scale );
-
     if( jetP4.pt() < pTmin ) continue;
-
     v_jets.push_back( TLorentzVector( jetP4.px(), jetP4.py(), jetP4.pz(), jetP4.e() ) );
-
-    nSavedJets++;
   } 
 }
