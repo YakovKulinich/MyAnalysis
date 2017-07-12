@@ -88,9 +88,9 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: Setup ()
   m_jetPtMin          = config->GetValue( "jetPtMin", 10 ) * 1000; // MeV
   m_jetRparameter     = config->GetValue( "jetRparameter", 0.4 ) ; 
 
-  m_nSys_unc       = config->GetValue( "nSystematics"   , 19 );
-  m_nSys_unc_pp    = config->GetValue( "nSystematics_pp", 17 );
-  m_nSys_unc_HI    = config->GetValue( "nSystematics_HI", 2  );
+  m_nSysUncert        = config->GetValue( "nSystematics"   , 19 );
+  m_nSysUncert_pp     = config->GetValue( "nSystematics_pp", 17 );
+  m_nSysUncert_HI     = config->GetValue( "nSystematics_HI", 2  );
 
   return xAOD::TReturnCode::kSuccess;
 }
@@ -127,7 +127,7 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: HistInitialize ()
   // add uncertainty unc
   if( !m_isData )
     { m_sd->AddOutputToTree< std::vector<std::vector<float> > >
-	("vSys_unc", &vSys_unc); }
+	("v_sysUncert", &v_sysUncert); }
 
   return xAOD::TReturnCode::kSuccess;
 }
@@ -218,10 +218,9 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
   // JETS                                                            
   //-------------------------------  
   // clear containers from previous event
-  vR_C_jets.clear();
-  vT_jets  .clear(); 
-  vSys_unc .clear();
-  
+  vR_C_jets   .clear();
+  vT_jets     .clear(); 
+  v_sysUncert .clear();
   v_isCleanJet.clear();
 
   // jet containers, initialize here to avoid problems later
@@ -238,9 +237,6 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
   xAOD::JetContainer*     calibRecoJets    = new xAOD::JetContainer();
   xAOD::AuxContainerBase* calibRecoJetsAux = new xAOD::AuxContainerBase();
   calibRecoJets->setStore( calibRecoJetsAux ); //< Connect the two
-
-  std::vector<bool> vTemp_isCleanJet;
-  std::vector< std::vector< float > > vTemp_sys_unc;
 
   for( const auto& jet : *recoJets ){
     bool isCleanJet = m_jetCleaningTool->accept( *jet );
@@ -262,10 +258,10 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
 
     // do systematic uncertainties
     if( isMC && m_doSystematics ){
-      std::vector< float > jet_sys_unc;
-      jet_sys_unc.reserve( m_nSys_unc );
-      UncertaintyProviderJES( newJet, jet_sys_unc );
-      vSys_unc.push_back( jet_sys_unc );
+      std::vector< float > jet_sys_uncert;
+      jet_sys_uncert.reserve( m_nSysUncert );
+      UncertaintyProviderJES( newJet, jet_sys_uncert );
+      v_sysUncert.push_back( jet_sys_uncert );
     }
   }// end for loop over jets
  
@@ -323,7 +319,7 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
     std::cout << "\nHave " << vR_C_jets.size() << " calibrated Jets" << std::endl;
     std::cout <<   "Have " << vT_jets.size()   << " truth Jets" << std::endl;
     int counter = 0;
-    for( auto & v : vSys_unc ){
+    for( auto & v : v_sysUncert ){
       std::cout << "jet " << counter++ << " : " << std::endl; 
       int sys = 0;
       for( auto & s : v ){
@@ -374,29 +370,29 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: HistFinalize()
 
 void JetAnalysis :: JetAnalysis :: UncertaintyProviderJES
 ( const xAOD::Jet* jet,
-  std::vector<float>& v_unc ){
+  std::vector<float>& v_uncert ){
 
-  for( int component = 0; component < m_nSys_unc; component++ ){
+  for( int component = 0; component < m_nSysUncert; component++ ){
     double jetPt  = jet->pt();
     double jetEta = jet->eta();
     
     float uncertainty = 0;
     // if a pp factor, just use this, and continue to next
-    if( component < m_nSys_unc_pp ){ 
+    if( component < m_nSysUncert_pp ){ 
       uncertainty = m_jetUncertaintyTool->getUncertainty( component,(*jet) );
-      v_unc.push_back( uncertainty );
+      v_uncert.push_back( uncertainty );
       continue; 
     }
 
     // if not a standard pp uncertainty, do more 
     float HIJESuncertainty = 0;
-    if ( component == m_nSys_unc_pp ){
+    if ( component == m_nSysUncert_pp ){
       HIJESuncertainty = 
 	sqrt(pow( m_hiJetUncertaintyTool->GetUncertaintyComponent
 		 ("flav_composition",jetPt, jetEta),2) + 
 	     pow( m_hiJetUncertaintyTool->GetUncertaintyComponent
 		 ("flav_response",jetPt, jetEta),2));
-    } else if ( component == m_nSys_unc_pp + 1 ) {
+    } else if ( component == m_nSysUncert_pp + 1 ) {
       /*
 	HIJESuncertainty = m_hiJetUncertaintyTool->
 	GetHIJESHisto( jetEta )->Interpolate( jetPt/1000.);
@@ -405,7 +401,7 @@ void JetAnalysis :: JetAnalysis :: UncertaintyProviderJES
       HIJESuncertainty = 0;
     }
    
-    v_unc.push_back( HIJESuncertainty );
+    v_uncert.push_back( HIJESuncertainty );
   }
 }
 

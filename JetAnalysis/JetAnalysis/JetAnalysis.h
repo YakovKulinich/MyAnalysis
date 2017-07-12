@@ -61,10 +61,10 @@ namespace JetAnalysis{
     std::vector< TLorentzVector > vT_jets;      
     std::vector< TLorentzVector > vTrig_jets;   
 
-    std::vector< std::vector< float > > vSys_unc;
-    int m_nSys_unc;
-    int m_nSys_unc_pp;
-    int m_nSys_unc_HI;
+    std::vector< std::vector< float > > v_sysUncert;
+    int m_nSysUncert;
+    int m_nSysUncert_pp;
+    int m_nSysUncert_HI;
 
     std::vector< bool > v_isCleanJet; 
 
