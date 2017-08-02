@@ -44,7 +44,7 @@ public:
     m_use_abs_eta=use_abs_eta;
   }
   
-  TH1* GetHIJESHisto( double eta ){ return 
+  TH1* GetHIJERHisto( double eta ){ return 
       m_vJEShistos[ GetEtaUJERBin(eta) ]; }
 
 private:

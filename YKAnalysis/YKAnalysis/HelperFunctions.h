@@ -7,6 +7,8 @@
 
 #include "YKAnalysis/Global.h"
 
+#include "xAODJet/JetContainer.h"
+
 #include "TFile.h"
 #include "TString.h"
 #include "TH1.h"
@@ -17,8 +19,6 @@
 #include "TRandom3.h"
 #include "TObjArray.h"
 #include "TObjString.h"
-
-#include "xAODJet/JetContainer.h"
 
 static const float GeV = 1000.;
 

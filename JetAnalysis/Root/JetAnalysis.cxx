@@ -395,7 +395,7 @@ void JetAnalysis :: JetAnalysis :: UncertaintyProviderJES
     } else if ( component == m_nSysUncert_pp + 1 ) {
       /*
 	HIJESuncertainty = m_hiJetUncertaintyTool->
-	GetHIJESHisto( jetEta )->Interpolate( jetPt/1000.);
+	GetHIJERHisto( jetEta )->Interpolate( jetPt/1000.);
       */
       // for now, the above doesnt work. histograms are bad
       HIJESuncertainty = 0;
