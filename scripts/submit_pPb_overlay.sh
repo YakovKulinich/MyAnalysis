@@ -1,4 +1,4 @@
-#!/bin/bash
+#overlay!/bin/bash
 
 USERNAME=ykulinic
 CONFIG=config/configOverlay_pPb.cfg
@@ -7,7 +7,7 @@ BLACKLIST=
 
 OUTPUTS=myOut.root
 
-INLIST=( data16_hip5TeV.00312968.physics_MinBiasOverlay.recon.AOD.f774_m1736 data16_hip5TeV.00312945.physics_MinBiasOverlay.recon.AOD.f774_m1736 data16_hip5TeV.00312937.physics_MinBiasOverlay.recon.AOD.f774_m1736 data16_hip5TeV.00312837.physics_MinBiasOverlay.recon.AOD.f774_m1736 )
+INLIST=( data16_hip5TeV.00312968.physics_MinBiasOverlay.recon.AOD.f774_m1736 data16_hip5TeV.00312945.physics_MinBiasOverlay.recon.AOD.f774_m1736 data16_hip5TeV.00312937.physics_MinBiasOverlay.recon.AOD.f774_m1736 data16_hip5TeV.00312837.physics_MinBiasOverlay.recon.AOD.f774_m1736 data16_hip5TeV.00312968.physics_MinBiasOverlay.recon.HIST.f774_h195 )
 
 now=$(date +"%T")
 echo "Current time : $now"

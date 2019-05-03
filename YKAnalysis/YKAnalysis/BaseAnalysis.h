@@ -19,6 +19,8 @@
 #include "TrigConfxAOD/xAODConfigTool.h"
 #include "TrigDecisionTool/TrigDecisionTool.h"
 
+class HIJESUncertaintyProvider;
+
 namespace YKAnalysis{
   
   class BaseAnalysis : public Analysis{
@@ -43,6 +45,9 @@ namespace YKAnalysis{
     int  m_eventNumber;         
     int  m_LBN;                  
     int  m_runNumber;
+
+    double m_FCalEtA;
+    double m_FCalEtC;
 
     //-----------------------
     // Triggers

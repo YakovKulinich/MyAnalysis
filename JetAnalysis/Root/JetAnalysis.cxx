@@ -18,8 +18,12 @@
 
 #include <JetSelectorTools/JetCleaningTool.h>
 #include <JetCalibTools/JetCalibrationTool.h>
+
 #include <JetUncertainties/JetUncertaintiesTool.h>
 #include <JetAnalysis/HIJESUncertaintyProvider.h>
+
+#include <xAODTracking/TrackParticleContainer.h>
+#include <InDetTrackSelectionTool/InDetTrackSelectionTool.h>
 
 #include <TMath.h>
 
@@ -38,10 +42,11 @@ JetAnalysis :: JetAnalysis :: JetAnalysis ( const std::string& name  )
   : YKAnalysis::Analysis ( name )
 {
   // tools
-  m_jetCleaningTool    = NULL;
-  m_jetCalibrationTool = NULL; 
+  m_jetCleaningTool      = NULL;
+  m_jetCalibrationTool   = NULL; 
   m_jetUncertaintyTool   = NULL;
   m_hiJetUncertaintyTool = NULL; 
+  m_trackSelectorTool    = NULL;
 }
 
 /** @brief Destructor for Fluctuation Analysis.
@@ -55,10 +60,12 @@ JetAnalysis :: JetAnalysis :: ~JetAnalysis()
   delete m_jetCalibrationTool;
   delete m_jetUncertaintyTool;
   delete m_hiJetUncertaintyTool;
+  delete m_trackSelectorTool;
   m_jetCleaningTool      = NULL;
   m_jetCalibrationTool   = NULL;
   m_jetUncertaintyTool   = NULL;
   m_hiJetUncertaintyTool = NULL; 
+  m_trackSelectorTool    = NULL;
 }
 
 /** @brief Setup method for Jet Analysis
@@ -116,13 +123,22 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: HistInitialize ()
     {m_sd->AddOutputToTree< std::vector<TLorentzVector> >
 	("vT_jets" , &vT_jets); }
 
-  m_sd->AddOutputToTree< std::vector<bool> >
-    ("v_isCleanJet", &v_isCleanJet );
-
   // Trigger jets. Only in Data
   if( m_isData )
     { m_sd->AddOutputToTree< std::vector<TLorentzVector> >
 	("vTrig_jets" , &vTrig_jets); }
+
+  m_sd->AddOutputToTree< std::vector<double> >
+    ("vRtrk1", &vRtrk1 );
+
+  m_sd->AddOutputToTree< std::vector<double> >
+    ("vRtrk2", &vRtrk2 );
+
+  m_sd->AddOutputToTree< std::vector<double> >
+    ("vRtrk4", &vRtrk4 );
+
+  m_sd->AddOutputToTree< std::vector<bool> >
+    ("v_isCleanJet", &v_isCleanJet );
 
   // add uncertainty unc
   if( !m_isData )
@@ -168,6 +184,7 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: Initialize ()
   CHECK_STATUS( statusL, m_jetCalibrationTool->setProperty( "IsData", isData ) );
   m_jetCalibrationTool->msg().setLevel( MSG::DEBUG ); 
   // Initialize the tool
+  std::cerr  << jetAlgorithm << " " << config << " " << calibSeq << " " << isData << std::endl;
   CHECK_STATUS( statusL, m_jetCalibrationTool->initializeTool(name) );
 
   // ----- JES (pp)
@@ -185,6 +202,15 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: Initialize ()
   m_hiJetUncertaintyTool = new HIJESUncertaintyProvider("HIJESUncert_data15_5TeV.root");
   m_hiJetUncertaintyTool->UseJESTool(true);
   m_hiJetUncertaintyTool->UseGeV(false);
+
+  // ----- Track Selector Tool
+  // Call Constructor
+  m_trackSelectorTool = new InDet::InDetTrackSelectionTool("InDetTrackSelectorTool");
+  CHECK_STATUS( statusL, m_trackSelectorTool->setProperty("CutLevel","TightPrimary"));
+  CHECK_STATUS( statusL, m_trackSelectorTool->setProperty("maxZ0SinTheta",1.0));
+  CHECK_STATUS( statusL, m_trackSelectorTool->setProperty("minPt",1.));
+  CHECK_STATUS( statusL, m_trackSelectorTool->setProperty("maxNSiSharedHits",100));
+  CHECK_STATUS( statusL, m_trackSelectorTool->initialize());
 
   return xAOD::TReturnCode::kSuccess;
 }
@@ -207,11 +233,19 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
   // check if the event is MC or data
   // (many tools are either for MC or data)
   bool isMC = false;
-  // check if the even is MC
+  // check if the event is MC
   if( eventInfo->eventType( xAOD::EventInfo::IS_SIMULATION ) ){
     isMC = true; // can use this later
+  } else {
+    const xAOD::TruthParticleContainer * particles = 0;
+    if( eventStore->xAOD::TVirtualEvent::retrieve(particles, "TruthParticles", true) ){
+      // this is overlay
+      isMC = true;
+    } else {
+      isMC = false;
+    }
   }
-
+  
   bool isData = isMC ? false : true;
 
   //-------------------------------    
@@ -222,6 +256,9 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
   vT_jets     .clear(); 
   v_sysUncert .clear();
   v_isCleanJet.clear();
+  vRtrk1      .clear();
+  vRtrk2      .clear();
+  vRtrk4      .clear();
 
   // jet containers, initialize here to avoid problems later
   const xAOD::JetContainer* recoJets  = 0;
@@ -231,7 +268,7 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
   CHECK_STATUS( statusL, eventStore->retrieve( recoJets, m_recoJetContainer.c_str() ) );
 
   if( m_sd->DoPrint() ) 
-    printf("%s  :  %i", m_recoJetContainer.c_str(), (int)recoJets->size() );
+    printf("%s  :  %i ", m_recoJetContainer.c_str(), (int)recoJets->size() );
   
   // Create the new container and its auxiliary store.
   xAOD::JetContainer*     calibRecoJets    = new xAOD::JetContainer();
@@ -251,7 +288,7 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
 
     // if the calibrated pT is less than a cut, dont
     // save or do anything else with this jet 
-    if( newJet->jetP4().pt() < m_jetPtMin ){ continue; }
+    if( newJet->pt() < m_jetPtMin ){ continue; }
 
     calibRecoJets->push_back( newJet );
     v_isCleanJet.push_back( isCleanJet );
@@ -263,7 +300,45 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
       UncertaintyProviderJES( newJet, jet_sys_uncert );
       v_sysUncert.push_back( jet_sys_uncert );
     }
-  }// end for loop over jets
+
+    // Match tracks to jets.
+    // add pT of associated tracks pTs to this jet
+    
+    //Tracks
+    const xAOD::TrackParticleContainer* recoTracks = 0;
+    CHECK_STATUS( statusL, eventStore->retrieve( recoTracks, "InDetTrackParticles" ) );
+
+    double trkPtTotal1 = 0;
+    double trkPtTotal2 = 0;
+    double trkPtTotal4 = 0;
+    for (const auto& trk : *recoTracks){
+      // cut on tracks that are not convered by tracker
+      if ( std::fabs( trk->eta() ) >= 2.5 ){ continue; }
+      // check if the track is within the jet radius
+      if ( DeltaR( jet, trk ) > m_jetRparameter ){ continue; }
+      // if we passed these cuts, add the track pT to the
+      // total track pT associated with this jet.
+      // there are three different cuts. on individual track pTs
+      double trkPt = trk->pt();
+
+      /*      
+      if( m_sd->DoPrint() ){
+	std::cout << jet->pt() << " " << jet->eta() << " " << jet->phi() << " " 
+		  << trk->pt() << " " << trk->eta() << " " << trk->phi() << std::endl;
+      }
+      */
+
+      if( trkPt > 1000. ){ trkPtTotal1 += trkPt; } // 1 GeV
+      if( trkPt > 2000. ){ trkPtTotal2 += trkPt; } // 2 GeV
+      if( trkPt > 4000. ){ trkPtTotal4 += trkPt; } // 4 GeV
+    }
+  
+    // add the track pt info here 
+    vRtrk1.push_back( trkPtTotal1 );
+    vRtrk2.push_back( trkPtTotal2 );
+    vRtrk4.push_back( trkPtTotal4 );
+  
+  } // end for loop over jets
  
   // get the truth containter (jets)
   if( isMC ){
@@ -313,21 +388,6 @@ xAOD::TReturnCode JetAnalysis :: JetAnalysis :: ProcessEvent(){
    
     SaveJets( trigJets, vTrig_jets, m_jetPtMin ); 
   }
-
-  /*
-  if( m_sd->DoPrint() ){
-    std::cout << "\nHave " << vR_C_jets.size() << " calibrated Jets" << std::endl;
-    std::cout <<   "Have " << vT_jets.size()   << " truth Jets" << std::endl;
-    int counter = 0;
-    for( auto & v : v_sysUncert ){
-      std::cout << "jet " << counter++ << " : " << std::endl; 
-      int sys = 0;
-      for( auto & s : v ){
-	std::cout << sys++ << " > " << s << std::endl;
-      }
-    }
-  }
-  */
 
   return xAOD::TReturnCode::kSuccess;
 }
@@ -393,10 +453,6 @@ void JetAnalysis :: JetAnalysis :: UncertaintyProviderJES
 	     pow( m_hiJetUncertaintyTool->GetUncertaintyComponent
 		 ("flav_response",jetPt, jetEta),2));
     } else if ( component == m_nSysUncert_pp + 1 ) {
-      /*
-	HIJESuncertainty = m_hiJetUncertaintyTool->
-	GetHIJERHisto( jetEta )->Interpolate( jetPt/1000.);
-      */
       // for now, the above doesnt work. histograms are bad
       HIJESuncertainty = 0;
     }
@@ -411,6 +467,17 @@ Float_t JetAnalysis :: JetAnalysis :: DeltaR( const xAOD::Jet* jet1 ,
 {  
   Float_t deltaEta = jet1->eta() - jet2->eta();
   Float_t deltaPhi = TMath::Abs( jet1->phi() - jet2->phi() );
+  if(deltaPhi > TMath::Pi())
+    deltaPhi = 2*TMath::Pi() - deltaPhi;
+  return TMath::Sqrt( deltaEta*deltaEta + deltaPhi*deltaPhi );
+}
+
+// calculate deltaR = sqrt( deltaphi^2 + deltaeta^2)
+Float_t JetAnalysis :: JetAnalysis :: DeltaR( const xAOD::Jet* jet , 
+					      const xAOD::TrackParticle* track )
+{  
+  Float_t deltaEta = jet->eta() - track->eta();
+  Float_t deltaPhi = TMath::Abs( jet->phi() - track->phi() );
   if(deltaPhi > TMath::Pi())
     deltaPhi = 2*TMath::Pi() - deltaPhi;
   return TMath::Sqrt( deltaEta*deltaEta + deltaPhi*deltaPhi );

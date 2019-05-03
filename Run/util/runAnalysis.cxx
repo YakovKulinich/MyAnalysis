@@ -2,7 +2,6 @@
  *  @brief Main function for analysis
  *
  *  Figure out which config to use.
- *
  *  Create the AnalysisManager and any
  *  secondary Analysis, add them to the manager
  *  and runs the analysis.
@@ -45,10 +44,10 @@ int main( int argc, char* argv[] ){
   // analysis in case you dont pass trigger (or maybe you do, depends)
   manager->AddAnalysis( make_shared<YKAnalysis::BaseAnalysis>() );
 
-  // should add JetAnalysis. 
+  // add JetAnalysis. 
   manager->AddAnalysis( make_shared<JetAnalysis::JetAnalysis>() );
 
-  // should add FluctuationAnalysis. 
+  // add FluctuationAnalysis. 
   // manager->AddAnalysis( make_shared<ClusterAnalysis::FluctuationAnalysis>() );
 
   // overlay analysis

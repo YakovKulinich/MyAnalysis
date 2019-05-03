@@ -14,8 +14,9 @@
 
 #include "YKAnalysis/BaseAnalysis.h"
 
-#include "xAODTracking/VertexContainer.h"
-#include "xAODTruth/TruthVertexContainer.h"
+#include <xAODTracking/VertexContainer.h>
+#include <xAODTruth/TruthVertexContainer.h>
+#include <xAODHIEvent/HIEventShapeContainer.h>
 
 #include <TSystem.h>
 
@@ -99,6 +100,9 @@ xAOD::TReturnCode YKAnalysis :: BaseAnalysis :: HistInitialize ()
   m_sd->AddOutputToTree<int>( "eventNumber", &m_eventNumber );
   m_sd->AddOutputToTree<int>( "LBN", &m_LBN );
   m_sd->AddOutputToTree<int>( "runNumber", &m_runNumber );
+
+  m_sd->AddOutputToTree< double >( "FCalEtA", &m_FCalEtA );
+  m_sd->AddOutputToTree< double >( "FCalEtC", &m_FCalEtC );
 
   TEnv* config = m_sd->GetConfig();
 
@@ -212,6 +216,14 @@ xAOD::TReturnCode YKAnalysis :: BaseAnalysis :: ProcessEvent(){
   // check if the even is MC
   if( eventInfo->eventType( xAOD::EventInfo::IS_SIMULATION ) ){
     isMC = true; // can use this later
+  } else {
+    const xAOD::TruthParticleContainer * particles = 0;
+    if( eventStore->xAOD::TVirtualEvent::retrieve(particles, "TruthParticles", true) ){
+      // this is overlay
+      isMC = true;
+    } else {
+      isMC = false;
+    }
   }
 
   m_runNumber   = eventInfo->runNumber();
@@ -302,6 +314,29 @@ xAOD::TReturnCode YKAnalysis :: BaseAnalysis :: ProcessEvent(){
 	return xAOD::TReturnCode::kRecoverable;
       }
   }
+
+  
+  //---------------------
+  // FCal
+  //---------------------
+  const xAOD::HIEventShapeContainer* calos=0;
+  CHECK_STATUS( "execute:", eventStore->retrieve( calos, "CaloSums"));
+
+  float m_fcalEt = 0;
+  m_FCalEtA = 0;
+  m_FCalEtC = 0;
+  const xAOD::HIEventShapeContainer *ptrEvtShpCon = 0;
+  CHECK_STATUS( "execute:", eventStore->retrieve(ptrEvtShpCon,"HIEventShape"));
+  for(const auto* ptrEvtShp : *ptrEvtShpCon){
+    if(ptrEvtShp->layer()!=21 && ptrEvtShp->layer()!=22 &&
+       ptrEvtShp->layer()!=23) continue;
+    m_fcalEt += ptrEvtShp->et()/1E6;
+    if((ptrEvtShp->etaMin()+ptrEvtShp->etaMax())/2>0) m_FCalEtA +=
+							ptrEvtShp->et()/1E6;
+    if((ptrEvtShp->etaMin()+ptrEvtShp->etaMax())/2<0) m_FCalEtC +=
+							ptrEvtShp->et()/1E6;
+  }
+
 
   return xAOD::TReturnCode::kSuccess;
 }

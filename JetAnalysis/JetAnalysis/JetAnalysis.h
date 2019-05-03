@@ -16,12 +16,17 @@
 
 #include <TLorentzVector.h>
 
+class TH2;
 class JetContainer;
 
 class JetCleaningTool;
 class JetCalibrationTool;
 class JetUncertaintiesTool;
 class HIJESUncertaintyProvider;
+
+namespace InDet{
+  class InDetTrackSelectionTool;
+}
 
 namespace JetAnalysis{
   
@@ -45,6 +50,9 @@ namespace JetAnalysis{
 
     Float_t DeltaR( const xAOD::Jet* ,   
 		    const xAOD::Jet* );
+
+    Float_t DeltaR( const xAOD::Jet* ,   
+		    const xAOD::TrackParticle* );
     
     void SaveJets( const xAOD::JetContainer* ,     // jets
 		   std::vector<TLorentzVector>&,   // calib output
@@ -61,12 +69,16 @@ namespace JetAnalysis{
     std::vector< TLorentzVector > vT_jets;      
     std::vector< TLorentzVector > vTrig_jets;   
 
+    std::vector< double > vRtrk1;
+    std::vector< double > vRtrk2;
+    std::vector< double > vRtrk4;
+
+    std::vector< bool > v_isCleanJet; 
+
     std::vector< std::vector< float > > v_sysUncert;
     int m_nSysUncert;
     int m_nSysUncert_pp;
     int m_nSysUncert_HI;
-
-    std::vector< bool > v_isCleanJet; 
 
     // configs
     bool        m_isData        ;
@@ -84,6 +96,7 @@ namespace JetAnalysis{
     JetCalibrationTool*       m_jetCalibrationTool; 
     JetUncertaintiesTool*     m_jetUncertaintyTool;
     HIJESUncertaintyProvider* m_hiJetUncertaintyTool;
+    InDet::InDetTrackSelectionTool*  m_trackSelectorTool;    
     
     // cuts
     float m_jetPtMin ;

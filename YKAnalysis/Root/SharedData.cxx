@@ -71,6 +71,8 @@ void YKAnalysis :: SharedData :: Initialize()
   m_config       = new TEnv ();
   m_config->ReadFile( m_configFileName.c_str(), EEnvLevel(0));
 
+  std::cout << m_config << " " << m_configFileName << std::endl;
+
   m_hEventStatistics = new TH1D( "hEventStatistics","hEventStatistics", 
 				 n_eventStatistics, 0, n_eventStatistics );
 }

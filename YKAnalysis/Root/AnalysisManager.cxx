@@ -158,6 +158,7 @@ xAOD::TReturnCode YKAnalysis :: AnalysisManager :: Setup ()
 
   std::string inputFileName = config->GetValue( "inputFileName", "" );
   int         runMode       = config->GetValue( "runMode" , 0 );
+  // bool      m_is_pPb        = config->GetValue( "is_pPb"  , 0 );
 
   //-----------------
   //  xAOD EventStore
@@ -172,6 +173,8 @@ xAOD::TReturnCode YKAnalysis :: AnalysisManager :: Setup ()
   //   Input files
   //-----------------
   std::vector< std::string > inputFileList;
+
+  std::cout << runMode << " " << inputFileName << std::endl;
 
   if( runMode == 1 ) {
     // running on grid, use pruns generated inputFiles.txt

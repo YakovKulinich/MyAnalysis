@@ -38,6 +38,8 @@ namespace YKAnalysis{
 
   private:
     int         m_maxEvents;
+
+    bool        m_is_pPb;
     
     std::string m_analysisName;
     std::string m_inputTreeName;

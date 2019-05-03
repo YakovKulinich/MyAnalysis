@@ -7,7 +7,8 @@ BLACKLIST=
 
 OUTPUTS=myOut.root
 
-INLIST=( data15_5TeV.periodK.physics_Main.PhysCont.AOD.repro20_v03 data15_5TeV.periodVdM.physics_Main.PhysCont.AOD.repro20_v03 )
+# INLIST=(data15_5TeV.00286282.physics_Main.recon.AOD.r9623 data15_5TeV.00286361.physics_Main.recon.AOD.r9582 data15_5TeV.00286364.physics_Main.recon.AOD.r9582 data15_5TeV.00286367.physics_Main.recon.AOD.r9582 data15_5TeV.00286411.physics_Main.recon.AOD.r9582 data15_5TeV.00286474.physics_Main.recon.AOD.r9582)
+INLIST=(data15_5TeV.00286364.physics_Main.recon.AOD.r9582 data15_5TeV.00286411.physics_Main.recon.AOD.r9582)
 
 now=$(date +"%T")
 echo "Current time : $now"
@@ -27,10 +28,11 @@ for fn in ${INLIST[@]} ; do
        --exec="echo %IN > inputFiles.txt; runAnalysis ${CONFIG}"\
        --useRootCore\
        --excludedSite=${BLACKLIST}\
-       --nGBPerJob=10\
+       --nGBPerJob=MAX\
+       --nFilesPerJob=15\
        --tmpDir=/tmp\
        --mergeOutput
 
 	 now=$(date +"%T")
 	 echo "Current time : $now"
-done                  #
+done
